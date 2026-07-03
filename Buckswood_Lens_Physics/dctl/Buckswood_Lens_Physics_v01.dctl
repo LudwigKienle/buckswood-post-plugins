@@ -1,0 +1,210 @@
+// ====================================================================
+// Buckswood Lens Physics v01
+// Safe DCTL fallback for lens-character simulation in DaVinci Resolve.
+// Native OFX version has the fuller CPU sampler. This DCTL is kept compact.
+// ====================================================================
+
+// 0 Neutral / Manual
+// 1 Clean Cinema Prime
+// 2 Vintage Spherical
+// 3 Petzval Swirl
+// 4 Anamorphic Soft
+// 5 Soviet Glow
+// 6 AI Deplastic Glass
+// 7-11 Lensfun-derived still-photo lens profiles. Distortion/TCA/vignette are based on Lensfun data; bloom/coma are Buckswood creative models.
+// 12-18 public industry-reference looks inspired by Dune/IMAX lens research, not copied commercial lens profiles.
+// 19 Buckswood Realistic Match
+DEFINE_UI_PARAMS(lens_preset, "Lens Preset", DCTLUI_COMBO_BOX, 19, { NEUTRAL, CLEAN_CINEMA, VINTAGE_SPHERICAL, PETZVAL_SWIRL, ANAMORPHIC_SOFT, SOVIET_GLOW, AI_DEPLASTIC_GLASS, LENSFUN_HELIOS_44, LENSFUN_MC_HELIOS_44M4, LENSFUN_ZEISS_BATIS_25, LENSFUN_VOIGT_NOKTON_58, LENSFUN_VOIGT_NOKTON_28, DUNE_P1_H_SERIES_IMAX, DUNE_P1_ULTRA_VISTA, DUNE_P2_MOVIECAM, DUNE_P2_SOVIET_GLASS, IMAX_1570_50MM, IMAX_1570_80MM, DUNE_P3_ATLAS_GOLDEN, REALISTIC_MATCH }, { "Neutral / Manual", "Clean Cinema Prime", "Vintage Spherical", "Petzval Swirl", "Anamorphic Soft", "Soviet Glow", "AI Deplastic Glass", "Lensfun Helios-44 58/2", "Lensfun MC Helios-44M-4 58/2", "Lensfun Zeiss Batis 25/2", "Lensfun Voigtlander Nokton 58/1.4", "Lensfun Voigtlander Nokton 28/1.5", "Dune P1 H-Series IMAX 1.43", "Dune P1 Ultra Vista 1.6x", "Dune P2 Moviecam Spherical", "Dune P2 Soviet Glass", "IMAX 15/70 50mm Sweet Spot", "IMAX 15/70 80mm Portrait", "Dune P3 Atlas Golden IMAX", "Buckswood Realistic Match" })
+DEFINE_UI_PARAMS(effect_strength, "Effect Strength", DCTLUI_SLIDER_FLOAT, 0.45, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(distortion_trim, "Distortion Trim", DCTLUI_SLIDER_FLOAT, 0.0, -1.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(chromatic_aberration, "Chromatic Aberration", DCTLUI_SLIDER_FLOAT, 0.015, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(fringing, "High Contrast Fringing", DCTLUI_SLIDER_FLOAT, 0.015, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(coma_amount, "Edge Coma", DCTLUI_SLIDER_FLOAT, 0.035, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(bloom_amount, "Highlight Bloom", DCTLUI_SLIDER_FLOAT, 0.075, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(bloom_threshold, "Bloom Threshold", DCTLUI_SLIDER_FLOAT, 0.82, 0.35, 1.0, 0.01)
+DEFINE_UI_PARAMS(vignette_amount, "Vignette", DCTLUI_SLIDER_FLOAT, 0.045, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(corner_color, "Corner Color Cast", DCTLUI_SLIDER_FLOAT, 0.020, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(swirl_amount, "Swirl", DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(overdrive, "Overdrive", DCTLUI_SLIDER_FLOAT, 0.85, 0.0, 3.0, 0.01)
+DEFINE_UI_PARAMS(output_mix, "Output Mix", DCTLUI_SLIDER_FLOAT, 0.55, 0.0, 1.0, 0.01)
+
+__DEVICE__ float bwlp_clamp01(float v)
+{
+    return _fminf(1.0f, _fmaxf(0.0f, v));
+}
+
+__DEVICE__ float bwlp_luma(float3 p)
+{
+    return 0.2627f * p.x + 0.6780f * p.y + 0.0593f * p.z;
+}
+
+__DEVICE__ float bwlp_smoothstep(float e0, float e1, float x)
+{
+    float t = bwlp_clamp01((x - e0) / _fmaxf(0.0001f, e1 - e0));
+    return t * t * (3.0f - 2.0f * t);
+}
+
+__DEVICE__ float bwlp_sample_clamped(__TEXTURE__ tex, float x, float y, int width, int height)
+{
+    return _tex2D(tex, _fminf((float)(width - 1), _fmaxf(0.0f, x)), _fminf((float)(height - 1), _fmaxf(0.0f, y)));
+}
+
+__DEVICE__ float3 bwlp_model()
+{
+    if (lens_preset == CLEAN_CINEMA)       return make_float3(0.015f, 0.16f, 0.18f);
+    if (lens_preset == VINTAGE_SPHERICAL) return make_float3(-0.075f, 0.36f, 0.42f);
+    if (lens_preset == PETZVAL_SWIRL)      return make_float3(-0.120f, 0.30f, 0.32f);
+    if (lens_preset == ANAMORPHIC_SOFT)   return make_float3(0.030f, 0.46f, 0.52f);
+    if (lens_preset == SOVIET_GLOW)       return make_float3(-0.105f, 0.42f, 0.60f);
+    if (lens_preset == AI_DEPLASTIC_GLASS)return make_float3(-0.035f, 0.22f, 0.28f);
+    if (lens_preset == LENSFUN_HELIOS_44) return make_float3(0.035f, 0.10f, 0.42f);
+    if (lens_preset == LENSFUN_MC_HELIOS_44M4) return make_float3(0.026f, 0.07f, 0.36f);
+    if (lens_preset == LENSFUN_ZEISS_BATIS_25) return make_float3(-0.055f, 0.04f, 0.20f);
+    if (lens_preset == LENSFUN_VOIGT_NOKTON_58) return make_float3(-0.030f, 0.06f, 0.30f);
+    if (lens_preset == LENSFUN_VOIGT_NOKTON_28) return make_float3(0.006f, 0.22f, 0.34f);
+    if (lens_preset == DUNE_P1_H_SERIES_IMAX) return make_float3(-0.012f, 0.10f, 0.24f);
+    if (lens_preset == DUNE_P1_ULTRA_VISTA) return make_float3(0.020f, 0.34f, 0.45f);
+    if (lens_preset == DUNE_P2_MOVIECAM) return make_float3(-0.018f, 0.12f, 0.28f);
+    if (lens_preset == DUNE_P2_SOVIET_GLASS) return make_float3(-0.070f, 0.28f, 0.48f);
+    if (lens_preset == IMAX_1570_50MM) return make_float3(-0.006f, 0.08f, 0.18f);
+    if (lens_preset == IMAX_1570_80MM) return make_float3(-0.004f, 0.06f, 0.16f);
+    if (lens_preset == DUNE_P3_ATLAS_GOLDEN) return make_float3(-0.004f, 0.12f, 0.30f);
+    if (lens_preset == REALISTIC_MATCH) return make_float3(-0.010f, 0.055f, 0.090f);
+    return make_float3(0.0f, 0.0f, 0.0f);
+}
+
+__DEVICE__ float4 bwlp_model2()
+{
+    if (lens_preset == CLEAN_CINEMA)       return make_float4(0.04f, 0.18f, 0.06f, 0.00f);
+    if (lens_preset == VINTAGE_SPHERICAL) return make_float4(0.28f, 0.35f, 0.22f, 0.04f);
+    if (lens_preset == PETZVAL_SWIRL)      return make_float4(0.34f, 0.42f, 0.20f, 0.42f);
+    if (lens_preset == ANAMORPHIC_SOFT)   return make_float4(0.18f, 0.26f, 0.14f, 0.02f);
+    if (lens_preset == SOVIET_GLOW)       return make_float4(0.38f, 0.48f, 0.30f, 0.16f);
+    if (lens_preset == AI_DEPLASTIC_GLASS)return make_float4(0.12f, 0.24f, 0.10f, 0.03f);
+    if (lens_preset == LENSFUN_HELIOS_44) return make_float4(0.30f, 0.46f, 0.28f, 0.24f);
+    if (lens_preset == LENSFUN_MC_HELIOS_44M4) return make_float4(0.26f, 0.48f, 0.30f, 0.18f);
+    if (lens_preset == LENSFUN_ZEISS_BATIS_25) return make_float4(0.06f, 0.39f, 0.12f, 0.00f);
+    if (lens_preset == LENSFUN_VOIGT_NOKTON_58) return make_float4(0.18f, 0.34f, 0.18f, 0.08f);
+    if (lens_preset == LENSFUN_VOIGT_NOKTON_28) return make_float4(0.14f, 0.58f, 0.24f, 0.04f);
+    if (lens_preset == DUNE_P1_H_SERIES_IMAX) return make_float4(0.08f, 0.20f, 0.07f, 0.00f);
+    if (lens_preset == DUNE_P1_ULTRA_VISTA) return make_float4(0.10f, 0.24f, 0.11f, 0.02f);
+    if (lens_preset == DUNE_P2_MOVIECAM) return make_float4(0.16f, 0.22f, 0.10f, 0.03f);
+    if (lens_preset == DUNE_P2_SOVIET_GLASS) return make_float4(0.34f, 0.42f, 0.24f, 0.18f);
+    if (lens_preset == IMAX_1570_50MM) return make_float4(0.04f, 0.08f, 0.03f, 0.00f);
+    if (lens_preset == IMAX_1570_80MM) return make_float4(0.03f, 0.06f, 0.025f, 0.00f);
+    if (lens_preset == DUNE_P3_ATLAS_GOLDEN) return make_float4(0.10f, 0.02f, 0.14f, 0.00f);
+    if (lens_preset == REALISTIC_MATCH) return make_float4(0.045f, 0.060f, 0.025f, 0.00f);
+    return make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+}
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+    float dryR = _tex2D(p_TexR, p_X, p_Y);
+    float dryG = _tex2D(p_TexG, p_X, p_Y);
+    float dryB = _tex2D(p_TexB, p_X, p_Y);
+    float3 dry = make_float3(dryR, dryG, dryB);
+
+    float cx = ((float)p_Width - 1.0f) * 0.5f;
+    float cy = ((float)p_Height - 1.0f) * 0.5f;
+    float nx = ((float)p_X - cx) / _fmaxf(1.0f, cx);
+    float ny = ((float)p_Y - cy) / _fmaxf(1.0f, cy);
+    float aspect = (float)p_Width / _fmaxf(1.0f, (float)p_Height);
+    float ax = nx * aspect;
+    float radius = _sqrtf(ax * ax + ny * ny);
+    float edge = bwlp_smoothstep(0.16f, 1.10f, radius);
+
+    float len = _sqrtf(nx * nx + ny * ny);
+    float dirX = len > 0.0001f ? nx / len : 0.0f;
+    float dirY = len > 0.0001f ? ny / len : 0.0f;
+    float tanX = -dirY;
+    float tanY = dirX;
+
+    float3 model = bwlp_model();
+    float4 model2 = bwlp_model2();
+    float distortion = (model.x + distortion_trim * 0.18f) * overdrive;
+    float ca = (model.y + chromatic_aberration) * overdrive;
+    float bloom = (model.z + bloom_amount) * overdrive;
+    float coma = (model2.x + coma_amount) * overdrive;
+    float vignette = (model2.y + vignette_amount) * overdrive;
+    float cast = (model2.z + corner_color) * overdrive;
+    float swirl = (model2.w + swirl_amount) * overdrive;
+
+    float swirlAngle = swirl * edge * edge * 0.22f;
+    float cs = _cosf(swirlAngle);
+    float sn = _sinf(swirlAngle);
+    float sx = nx * cs - ny * sn;
+    float sy = nx * sn + ny * cs;
+
+    float r2 = radius * radius;
+    float radial = 1.0f + distortion * r2 + distortion * 0.35f * r2 * r2;
+    float srcX = cx + sx * radial * cx;
+    float srcY = cy + sy * radial * cy;
+
+    float caPx = ca * edge * edge * 5.0f;
+    float rr = bwlp_sample_clamped(p_TexR, srcX + dirX * caPx, srcY + dirY * caPx, p_Width, p_Height);
+    float gg = bwlp_sample_clamped(p_TexG, srcX, srcY, p_Width, p_Height);
+    float bb = bwlp_sample_clamped(p_TexB, srcX - dirX * caPx, srcY - dirY * caPx, p_Width, p_Height);
+    float3 rgb = make_float3(rr, gg, bb);
+
+    float3 left = make_float3(
+        bwlp_sample_clamped(p_TexR, srcX - 1.0f, srcY, p_Width, p_Height),
+        bwlp_sample_clamped(p_TexG, srcX - 1.0f, srcY, p_Width, p_Height),
+        bwlp_sample_clamped(p_TexB, srcX - 1.0f, srcY, p_Width, p_Height));
+    float3 right = make_float3(
+        bwlp_sample_clamped(p_TexR, srcX + 1.0f, srcY, p_Width, p_Height),
+        bwlp_sample_clamped(p_TexG, srcX + 1.0f, srcY, p_Width, p_Height),
+        bwlp_sample_clamped(p_TexB, srcX + 1.0f, srcY, p_Width, p_Height));
+    float gradient = _fabs(bwlp_luma(right) - bwlp_luma(left));
+    float fringe = bwlp_clamp01((model2.z + fringing) * edge * gradient * 1.8f * overdrive);
+    rgb.x += fringe * 0.10f;
+    rgb.y -= fringe * 0.035f;
+    rgb.z += fringe * 0.075f;
+
+    float centerLum = bwlp_luma(rgb);
+    float hot = bwlp_clamp01((centerLum - bloom_threshold) / _fmaxf(0.001f, 1.0f - bloom_threshold));
+    if (bloom > 0.0001f && hot > 0.0001f) {
+        float bloomRadius = 2.0f + bloom * 8.0f;
+        float3 b1 = make_float3(
+            bwlp_sample_clamped(p_TexR, srcX + bloomRadius, srcY, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexG, srcX + bloomRadius, srcY, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexB, srcX + bloomRadius, srcY, p_Width, p_Height));
+        float3 b2 = make_float3(
+            bwlp_sample_clamped(p_TexR, srcX - bloomRadius, srcY, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexG, srcX - bloomRadius, srcY, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexB, srcX - bloomRadius, srcY, p_Width, p_Height));
+        float3 b3 = make_float3(
+            bwlp_sample_clamped(p_TexR, srcX, srcY + bloomRadius, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexG, srcX, srcY + bloomRadius, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexB, srcX, srcY + bloomRadius, p_Width, p_Height));
+        float3 b4 = make_float3(
+            bwlp_sample_clamped(p_TexR, srcX, srcY - bloomRadius, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexG, srcX, srcY - bloomRadius, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexB, srcX, srcY - bloomRadius, p_Width, p_Height));
+        float3 blur = (b1 + b2 + b3 + b4) * 0.25f;
+        rgb += blur * bloom * (0.16f + hot * 0.35f);
+    }
+
+    if (coma > 0.0001f) {
+        float comaPx = (1.2f + coma * 5.0f) * edge * edge;
+        float3 comet = make_float3(
+            bwlp_sample_clamped(p_TexR, srcX + tanX * comaPx + dirX * comaPx * 0.6f, srcY + tanY * comaPx + dirY * comaPx * 0.6f, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexG, srcX + tanX * comaPx + dirX * comaPx * 0.6f, srcY + tanY * comaPx + dirY * comaPx * 0.6f, p_Width, p_Height),
+            bwlp_sample_clamped(p_TexB, srcX + tanX * comaPx + dirX * comaPx * 0.6f, srcY + tanY * comaPx + dirY * comaPx * 0.6f, p_Width, p_Height));
+        float cometHot = bwlp_clamp01((bwlp_luma(comet) - 0.58f) / 0.42f);
+        rgb += comet * coma * edge * edge * cometHot * 0.28f;
+    }
+
+    float edge2 = edge * edge;
+    float vigGain = 1.0f - bwlp_clamp01(vignette) * edge2 * 0.46f;
+    rgb *= vigGain;
+    rgb.x += cast * edge2 * 0.025f;
+    rgb.y += cast * edge2 * 0.006f;
+    rgb.z -= cast * edge2 * 0.018f;
+
+    rgb.x = bwlp_clamp01(rgb.x);
+    rgb.y = bwlp_clamp01(rgb.y);
+    rgb.z = bwlp_clamp01(rgb.z);
+
+    float mixAmt = bwlp_clamp01(effect_strength * output_mix);
+    return dry + (rgb - dry) * mixAmt;
+}

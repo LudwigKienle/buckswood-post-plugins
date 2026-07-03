@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  resolve-smoketests:
+    name: Resolve OFX smoke tests
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build smoke tests
+        run: |
+          make -C Buckswood_Fake_Diagnostic smoketest
+          make -C Buckswood_Lens_Physics smoketest
+          make -C Buckswood_AI_Photorealizer smoketest
+
+      - name: Build macOS OFX bundles
+        run: |
+          make -C Buckswood_Fake_Diagnostic bundle
+          make -C Buckswood_Lens_Physics bundle
+          make -C Buckswood_AI_Photorealizer bundle
+
+      - name: Build Premiere adapter smoke test
+        run: bash premiere_port/scripts/build_adapter_smoketest.sh

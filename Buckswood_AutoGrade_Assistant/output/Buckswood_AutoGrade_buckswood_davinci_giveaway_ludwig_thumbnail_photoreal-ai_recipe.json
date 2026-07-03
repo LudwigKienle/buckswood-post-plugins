@@ -1,0 +1,89 @@
+{
+  "analysis": {
+    "image": "/Users/ludwig.kienle/Downloads/Davinci_plug_in/Buckswood_YouTube_Giveaway_HeyGen/renders/buckswood_davinci_giveaway_ludwig_thumbnail.jpg",
+    "width": 1280,
+    "height": 720,
+    "luma": {
+      "p01": 0.1670636117647059,
+      "p05": 0.22801447058823532,
+      "p50": 0.720156274509804,
+      "p95": 0.9699258823529412,
+      "p99": 0.9797286274509804,
+      "span_p05_p95": 0.7419114117647059
+    },
+    "saturation": {
+      "average": 0.268224654372221,
+      "p90": 0.5543478260869564,
+      "neon_score": 0.18776041666666665
+    },
+    "clip": {
+      "highlight_score": 0.8669874264705886,
+      "shadow_score": 0.0,
+      "high_clip_fraction": 0.03540364583333333,
+      "low_clip_fraction": 0.0
+    },
+    "color": {
+      "mean_r": 0.7466964358660131,
+      "mean_g": 0.6566858489923747,
+      "mean_b": 0.6048453499455337,
+      "gray_world_r_gain": 0.8964944513561675,
+      "gray_world_g_gain": 1.019375113120612,
+      "gray_world_b_gain": 1.1067444127024988
+    },
+    "subject": {
+      "skin_candidate_fraction": 0.13206597222222222,
+      "edge_score": 0.02168884463507625,
+      "smooth_score": 0.71081540486565,
+      "plastic_score": 0.4351616306735657
+    },
+    "scores": {
+      "flat_contrast": 0.0,
+      "harsh_contrast": 0.0,
+      "plastic_look": 0.4351616306735657,
+      "neon_color": 0.18776041666666665,
+      "clipped_highlights": 0.8669874264705886,
+      "crushed_shadows": 0.0
+    }
+  },
+  "grade": {
+    "style": "photoreal-ai",
+    "strength": 0.55,
+    "exposure_ev": -0.3,
+    "contrast": 0.92,
+    "saturation": 0.96,
+    "r_gain": 0.9668782244339735,
+    "g_gain": 1.0062000361985959,
+    "b_gain": 1.0341582120647996,
+    "highlight_roll": 0.7768430845588237,
+    "shadow_lift": 0.0,
+    "shadow_depth": 0.055,
+    "gamut_guard": 0.5941336196010348,
+    "scores": {
+      "flat_contrast": 0.0,
+      "harsh_contrast": 0.0,
+      "plastic_look": 0.4351616306735657,
+      "neon_color": 0.18776041666666665,
+      "clipped_highlights": 0.8669874264705886,
+      "crushed_shadows": 0.0
+    },
+    "dctl_recommendations": {
+      "Plastic Reduction": 0.55,
+      "Skin Realism": 0.72,
+      "Highlight Realism": 0.8,
+      "Color Naturalize": 0.5,
+      "Sensor Texture": 0.23,
+      "Micro Contrast": 0.18,
+      "Gamut Guard": 0.59,
+      "Shadow Depth": 0.32,
+      "Smoothness Breakup": 0.34,
+      "Output Mix": 0.62
+    },
+    "vision_notes": []
+  },
+  "vision": {},
+  "outputs": {
+    "cube": "/Users/ludwig.kienle/Downloads/Davinci_plug_in/Buckswood_AutoGrade_Assistant/output/Buckswood_AutoGrade_buckswood_davinci_giveaway_ludwig_thumbnail_photoreal-ai_33.cube",
+    "preview": "/Users/ludwig.kienle/Downloads/Davinci_plug_in/Buckswood_AutoGrade_Assistant/output/Buckswood_AutoGrade_buckswood_davinci_giveaway_ludwig_thumbnail_photoreal-ai_preview.jpg",
+    "report": "/Users/ludwig.kienle/Downloads/Davinci_plug_in/Buckswood_AutoGrade_Assistant/output/Buckswood_AutoGrade_buckswood_davinci_giveaway_ludwig_thumbnail_photoreal-ai_report.md"
+  }
+}

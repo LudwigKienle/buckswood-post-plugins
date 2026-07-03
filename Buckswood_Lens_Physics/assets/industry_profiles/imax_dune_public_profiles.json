@@ -1,0 +1,193 @@
+{
+  "name": "Buckswood IMAX and Dune public lens reference profiles",
+  "version": "2026-06-30",
+  "source_policy": "Public facts and original Buckswood mappings only. No proprietary/commercial lens profile coefficients copied.",
+  "profiles": [
+    {
+      "id": "dune_part_one_h_series_imax_143",
+      "display_name": "Dune P1 H-Series IMAX 1.43",
+      "basis": "Panavision H Series spherical lenses used for Dune Part One's 1.43 IMAX sequences on ARRI Alexa LF.",
+      "source_urls": [
+        "https://theasc.com/article/dune-fear-is-the-mind-killer/",
+        "https://britishcinematographer.co.uk/greig-fraser-asc-acs-dune/",
+        "https://www.panavision.com/camera-and-optics/optics/product-detail/h-h-series"
+      ],
+      "public_facts": [
+        "H Series is described by Panavision as classic portrait glass with rounded soft roll-off, pleasing skin tone, elevated blacks, and softer contrast.",
+        "Dune Part One sources identify H Series as the spherical lens choice for 1.43 IMAX sequences."
+      ],
+      "plugin_mapping": {
+        "distortion": -0.012,
+        "chromaticAberration": 0.10,
+        "fringing": 0.09,
+        "coma": 0.08,
+        "bloom": 0.24,
+        "vignette": 0.20,
+        "cornerColor": 0.07,
+        "swirl": 0.00,
+        "sharpener": 0.02,
+        "warmBias": 0.018,
+        "blueBias": 0.004
+      }
+    },
+    {
+      "id": "dune_part_one_ultra_vista_16x",
+      "display_name": "Dune P1 Ultra Vista 1.6x",
+      "basis": "Panavision Ultra Vista 1.6x anamorphic lenses used for Dune Part One's 2.39 sequences.",
+      "source_urls": [
+        "https://theasc.com/article/dune-fear-is-the-mind-killer/",
+        "https://www.panavision.com/camera-and-optics/optics/product-detail/uv-ultra-vista",
+        "https://filmmakermagazine.com/112635-we-used-the-entire-sensor-on-the-alexa-lf-every-single-time-dp-greig-fraser-on-shooting-dune-for-imax/"
+      ],
+      "public_facts": [
+        "Ultra Vista is listed by Panavision as 1.6x anamorphic, seven focal lengths, typical T2.5, and full-frame 8K coverage.",
+        "Panavision describes traditional flares, vertical bias, organic anamorphic character, and depth."
+      ],
+      "plugin_mapping": {
+        "distortion": 0.020,
+        "chromaticAberration": 0.34,
+        "fringing": 0.30,
+        "coma": 0.10,
+        "bloom": 0.45,
+        "vignette": 0.24,
+        "cornerColor": 0.11,
+        "swirl": 0.02,
+        "sharpener": -0.02,
+        "warmBias": 0.012,
+        "blueBias": 0.020
+      }
+    },
+    {
+      "id": "dune_part_two_moviecam_spherical",
+      "display_name": "Dune P2 Moviecam Spherical",
+      "basis": "ARRI Rental Moviecam spherical lenses used on Dune Part Two.",
+      "source_urls": [
+        "https://theasc.com/article/expanding-view-dune-part-two/",
+        "https://www.arrirental.com/en/about/overview/news/interview-on-dune-part-two-with-greig-fraser-acs-asc",
+        "https://www.arrirental.com/en/lenses/full-frame-lenses/moviecam"
+      ],
+      "public_facts": [
+        "ARRI Rental describes Moviecam as 1980s vintage optics rebuilt for large-format, with smooth focus falloff and controlled character.",
+        "ASC notes Moviecam was used where resolution and texture were important."
+      ],
+      "plugin_mapping": {
+        "distortion": -0.018,
+        "chromaticAberration": 0.12,
+        "fringing": 0.10,
+        "coma": 0.16,
+        "bloom": 0.28,
+        "vignette": 0.22,
+        "cornerColor": 0.10,
+        "swirl": 0.03,
+        "sharpener": 0.00,
+        "warmBias": 0.020,
+        "blueBias": 0.005
+      }
+    },
+    {
+      "id": "dune_part_two_soviet_glass",
+      "display_name": "Dune P2 Soviet Glass",
+      "basis": "IronGlass Soviet-era lenses used on Dune Part Two, including publicly named Helios, Jupiter, and Mir examples.",
+      "source_urls": [
+        "https://theasc.com/article/expanding-view-dune-part-two/",
+        "https://www.arrirental.com/en/about/overview/news/interview-on-dune-part-two-with-greig-fraser-acs-asc"
+      ],
+      "public_facts": [
+        "ASC names Jupiter-9 85mm, Helios 44-2 58mm, and Mir-1V 37mm as IronGlass lenses ordered for the production.",
+        "ARRI/ASC coverage frames the Soviet-era glass as texture-oriented and characterful."
+      ],
+      "plugin_mapping": {
+        "distortion": -0.070,
+        "chromaticAberration": 0.28,
+        "fringing": 0.26,
+        "coma": 0.34,
+        "bloom": 0.48,
+        "vignette": 0.42,
+        "cornerColor": 0.24,
+        "swirl": 0.18,
+        "sharpener": -0.06,
+        "warmBias": 0.035,
+        "blueBias": -0.010
+      }
+    },
+    {
+      "id": "imax_1570_50mm_sweet_spot",
+      "display_name": "IMAX 15/70 50mm Sweet Spot",
+      "basis": "Clean 50mm large-format face/wide sweet spot inspired by public IMAX 15/70 and Hoytema/Nolan lens discussions.",
+      "source_urls": [
+        "https://www.cinematography.net/edited-pages/IMAX15perf_70mmTechSpecs.htm",
+        "https://ymcinema.com/2023/07/25/the-lenses-behind-oppenheimer-modified-panavision-and-an-imax-snorkel-lens/"
+      ],
+      "public_facts": [
+        "IMAX 15/70 is a much larger horizontal frame format than standard 35mm open gate.",
+        "Public Oppenheimer lens coverage highlights 50mm as an IMAX large-format sweet spot."
+      ],
+      "plugin_mapping": {
+        "distortion": -0.006,
+        "chromaticAberration": 0.08,
+        "fringing": 0.06,
+        "coma": 0.04,
+        "bloom": 0.18,
+        "vignette": 0.08,
+        "cornerColor": 0.03,
+        "swirl": 0.00,
+        "sharpener": 0.08,
+        "warmBias": 0.006,
+        "blueBias": 0.004
+      }
+    },
+    {
+      "id": "imax_1570_80mm_portrait",
+      "display_name": "IMAX 15/70 80mm Portrait",
+      "basis": "Clean 80mm large-format portrait sweet spot inspired by public IMAX 15/70 and Hoytema/Nolan lens discussions.",
+      "source_urls": [
+        "https://ymcinema.com/2023/07/25/the-lenses-behind-oppenheimer-modified-panavision-and-an-imax-snorkel-lens/",
+        "https://www.panavision.com/highlights/credits/credits-detail/oppenheimer"
+      ],
+      "public_facts": [
+        "Public Oppenheimer coverage highlights 80mm alongside 50mm as a core large-format face/portrait focal length.",
+        "Panavision credits Oppenheimer with System 65 and Sphero 65 optics."
+      ],
+      "plugin_mapping": {
+        "distortion": -0.004,
+        "chromaticAberration": 0.06,
+        "fringing": 0.05,
+        "coma": 0.03,
+        "bloom": 0.16,
+        "vignette": 0.06,
+        "cornerColor": 0.025,
+        "swirl": 0.00,
+        "sharpener": 0.10,
+        "warmBias": 0.004,
+        "blueBias": 0.003
+      }
+    },
+    {
+      "id": "dune_part_three_atlas_golden_imax",
+      "display_name": "Dune P3 Atlas Golden IMAX",
+      "basis": "Reported Atlas Lens Co. custom spherical IMAX lenses for Dune Part Three.",
+      "source_urls": [
+        "https://www.newsshooter.com/2026/03/20/atlas-lens-co-spherical-imax-lenses-for-dune-part-three/",
+        "https://www.newsshooter.com/2026/06/05/atlas-lens-co-kaizen-1-5x-anamorphic-lenses-custom-spherical-imax-lenses-at-cine-gear-2026/",
+        "https://www.redsharknews.com/atlas-lens-co-custom-imax-lenses-dune-part-three"
+      ],
+      "public_facts": [
+        "Trade coverage reports custom spherical IMAX lenses for Dune Part Three.",
+        "Reported design goals include golden single coating, full 15-perf non-vignetting coverage, short close focus, and unique corner character."
+      ],
+      "plugin_mapping": {
+        "distortion": -0.004,
+        "chromaticAberration": 0.12,
+        "fringing": 0.18,
+        "coma": 0.10,
+        "bloom": 0.30,
+        "vignette": 0.02,
+        "cornerColor": 0.14,
+        "swirl": 0.00,
+        "sharpener": 0.06,
+        "warmBias": 0.045,
+        "blueBias": 0.000
+      }
+    }
+  ]
+}

@@ -1,0 +1,1352 @@
+// ====================================================================
+// Buckswood IMAX / Large Format Film Emulation
+// Based on the stable Buckswood Film Emulation DCTL
+// Designed for working inside DaVinci Wide Gamut / Intermediate
+// Inspired by Cullen Kelly Color Science & Hollywood Film Physics
+// ====================================================================
+
+// Define Input Color Space Options
+// 0 = DaVinci Wide Gamut / Intermediate (DWG/DI)
+// 1 = Sony S-Log3 / S-Gamut3.Cine
+// 2 = ARRI LogC3
+// 3 = ARRI LogC4
+// 4 = Apple Log
+// 5 = AI Footage / Rec.709
+DEFINE_UI_PARAMS(input_space, "Input Space", DCTLUI_COMBO_BOX, 0, { DWG_DI, SONY_SLOG3, ARRI_LOGC3, ARRI_LOGC4, APPLE_LOG, REC709_AI }, { "DaVinci Wide Gamut", "Sony S-Log3", "ARRI LogC3", "ARRI LogC4", "Apple Log", "AI Footage (Rec.709)" })
+
+// Define Output Color Space Options
+// 0 = Bypass (Keep DWG/DI)
+// 1 = Rec.709 (Gamma 2.4)
+// 2 = DCI-P3 (Gamma 2.6)
+// 3 = Rec.2020 (Gamma 2.4)
+DEFINE_UI_PARAMS(output_space, "Output Space", DCTLUI_COMBO_BOX, 0, { BYPASS_OUT, REC709_OUT, DCIP3_OUT, REC2020_OUT }, { "Bypass (Keep DWG/DI)", "Rec.709 (Gamma 2.4)", "DCI-P3 (Gamma 2.6)", "Rec.2020 (Gamma 2.4)" })
+
+// Define Preset Combo Box options
+// 0 = Manual/Custom
+// 1 = Kodak 2383 Print Emulation
+// 2 = Fuji 3513 Print Emulation
+// 3 = Kodak 5219 (Vision3 500T) Negative Emulation
+// 4 = Agfa JT 12.5 Vintage Print Emulation
+// 5 = Fuji Superia 400 Consumer Negative Emulation
+// 6 = Kodak Ektachrome 100D Color Reversal Slide Film
+// 7 = Kodak Tri-X 400 Gritty Black & White Film
+// 8 = Polaroid 600 Nostalgic Instant Vintage Film
+// 9 = Kodak Vision3 250D Daylight Cinema Negative
+// 10 = Fuji Velvia 50 Ultra-Vivid Color Slide Film
+// 11 = Kodak Kodachrome 64 Legendary Vintage Slide
+// 12 = Ilford HP5 Plus 400 Classic Fine-Art B&W
+// 13 = CineStill 800T Tungsten Halation Cinema Look
+// 14 = Kodak Gold 200 Warm Golden Consumer negative
+// 15 = Kodak Portra 400 Professional Portrait Negative
+// 16 = Kodak Portra 160 Low Contrast Fashion Pastels
+// 17 = Kodak Ektar 100 Ultra Vivid Finest Grain Negative
+// 18 = CineStill 50D Daylight Cinema Halation Look
+// 19 = Fuji Pro 400H Soft Pastel Wedding Slide Look
+// 20 = Fuji Astia 100F Natural Balanced Portrait Slide
+// 21 = Fuji Provia 100F Clean Daylight Color Slide
+// 22 = Agfaphoto Vista 400 Saturated Primary Reds Look
+// 23 = Lomography CN 800 Saturated Retro Warm Look
+// 24 = Lomography Metropolis Desaturated Cold Gray Look
+// 25 = Lomography Purple false-color Violet Dreamscape
+// 26 = ORWO UN54 Historic German B&W Cinema Movie Film
+// 27 = Fomapan 100 Czech Retro High Contrast B&W Film
+// 28 = Ilford Delta 3200 Extreme High Grain Gritty B&W
+// 29 = Kodak Aerochrome Infrared false-color Hot foliage Look
+// 30 = Technicolor 2-Strip Vintage 1920s Movie Look
+// 31 = IMAX 15/70 Clean Large Format
+// 32 = IMAX Digital Large Format Clean
+// 33 = IMAX Night Large Format
+// 34 = IMAX Warm Print Large Format
+DEFINE_UI_PARAMS(preset, "Film Profile", DCTLUI_COMBO_BOX, 0, { CUSTOM, KODAK_2383, FUJI_3513, KODAK_5219, AGFA_JT12, FUJI_SUPERIA, EKTACHROME, TRIX_400, POLAROID, KODAK_250D, FUJI_VELVIA, KODACHROME, ILFORD_HP5, CINESTILL_800T, KODAK_GOLD, PORTRA_400, PORTRA_160, EKTAR_100, CINESTILL_50D, FUJI_PRO400H, ASTIA_100F, PROVIA_100F, VISTA_400, LOMO_800, METROPOLIS, LOMO_PURPLE, ORWO_UN54, FOMAPAN_100, DELTA_3200, AEROCHROME, TECHNICOLOR_2STRIP, IMAX_1570_CLEAN, IMAX_DLF_CLEAN, IMAX_NIGHT, IMAX_WARM_PRINT }, { "Manual / Custom", "Kodak 2383 Print", "Fuji 3513 Print", "Kodak 5219 Negative", "Agfa JT 12.5 Print", "Fuji Superia 400", "Ektachrome 100D Slide", "Kodak Tri-X 400 B&W", "Polaroid 600 Vintage", "Kodak Vision3 250D Cinema", "Fuji Velvia 50 Slide", "Kodak Kodachrome 64", "Ilford HP5 Plus 400 B&W", "CineStill 800T Cinema", "Kodak Gold 200", "Kodak Portra 400", "Kodak Portra 160", "Kodak Ektar 100", "CineStill 50D Cinema", "Fuji Pro 400H", "Fuji Astia 100F", "Fuji Provia 100F", "Agfaphoto Vista 400", "Lomography CN 800", "Lomography Metropolis", "Lomography Purple", "ORWO UN54 B&W Cinema", "Fomapan 100 B&W", "Ilford Delta 3200 B&W", "Kodak Aerochrome IR", "Technicolor 2-Strip", "IMAX 15/70 Clean", "IMAX DLF Clean", "IMAX Night", "IMAX Warm Print" })
+
+
+
+// Define UI sliders for the DaVinci Resolve color page interface
+DEFINE_UI_PARAMS(contrast, "Contrast", DCTLUI_SLIDER_FLOAT, 1.0, 0.5, 2.0, 0.01)
+DEFINE_UI_PARAMS(saturation, "Saturation", DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 2.0, 0.01)
+
+// Subtractive Film CMY Dye Density Sliders (Dye Absorption Layer Emulation)
+DEFINE_UI_PARAMS(density_c, "Cyan Dye Density", DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(density_m, "Magenta Dye Density", DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(density_y, "Yellow Dye Density", DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+
+// Subtractive Film Dye Crosstalk Sliders (Normalized 3x3 Mixer)
+DEFINE_UI_PARAMS(crosstalk_rg, "Red Green Crosstalk", DCTLUI_SLIDER_FLOAT, 0.0, -0.2, 0.2, 0.01)
+DEFINE_UI_PARAMS(crosstalk_rb, "Red Blue Crosstalk", DCTLUI_SLIDER_FLOAT, 0.0, -0.2, 0.2, 0.01)
+DEFINE_UI_PARAMS(crosstalk_gb, "Green Blue Crosstalk", DCTLUI_SLIDER_FLOAT, 0.0, -0.2, 0.2, 0.01)
+
+// Hollywood Localized 3D HSL Warp Sliders
+DEFINE_UI_PARAMS(skin_warm, "Skin Tone Warmth", DCTLUI_SLIDER_FLOAT, 0.0, -1.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(shadow_cool, "Shadow Cooling", DCTLUI_SLIDER_FLOAT, 0.0, -1.0, 1.0, 0.01)
+
+// Film Halation Glow & Highlight Gate Bloom Sliders
+DEFINE_UI_PARAMS(halation, "Film Halation Glow", DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(gate_bloom, "Highlight Gate Bloom", DCTLUI_SLIDER_FLOAT, 0.1, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(highlight_roll, "Highlight Soft Roll-off", DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+
+// Film Grain & Silver Flicker Sliders
+DEFINE_UI_PARAMS(grain_amount, "Film Grain Amount", DCTLUI_SLIDER_FLOAT, 0.1, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(grain_size, "Film Grain Size", DCTLUI_SLIDER_FLOAT, 1.0, 0.5, 2.5, 0.01)
+DEFINE_UI_PARAMS(grain_sat, "Film Grain Saturation", DCTLUI_SLIDER_FLOAT, 0.5, 0.0, 2.0, 0.01)
+DEFINE_UI_PARAMS(grain_bias, "Film Grain Bias", DCTLUI_SLIDER_FLOAT, 0.0, -1.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(silver_flicker, "Silver Density Flicker", DCTLUI_SLIDER_FLOAT, 0.1, 0.0, 1.0, 0.01)
+
+// Hollywood Masterpiece Advanced Extension Sliders
+DEFINE_UI_PARAMS(hl_desat, "Highlight Desaturation", DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(chroma_soft, "Chroma Edge Softening", DCTLUI_SLIDER_FLOAT, 0.1, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(gate_weave, "Micro Gate Weave", DCTLUI_SLIDER_FLOAT, 0.1, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(grain_seed, "Grain Seed / Animate", DCTLUI_SLIDER_FLOAT, 1.0, 1.0, 1000.0, 0.1)
+
+// --------------------------------------------------------------------
+// High-Performance 3D Bitwise Integer Hash Function (MurmurHash3 Finalizer)
+// Returns a highly uniform pseudo-random float strictly in range [0.0f, 1.0f)
+// 100% free of spatial repeating patterns, grids, Moire banding, or float precision loss.
+// --------------------------------------------------------------------
+__DEVICE__ float hash3d(int x, int y, int z) {
+    // 1. Spatial prime mixers (completely decorrelates spatial positions)
+    unsigned int h = (unsigned int)x * 73856093 ^ (unsigned int)y * 19349663 ^ (unsigned int)z * 83492791;
+    
+    // 2. MurmurHash3 32-bit finalizer integer mix
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    
+    // 3. Float normalization in [0.0f, 1.0f) using 24-bit mantissa mask
+    return (float)(h & 0xffffff) / 16777216.0f;
+}
+
+// --------------------------------------------------------------------
+// Input Color Space Curve Translators
+// Natively converts camera-specific log curves to DaVinci Intermediate
+// --------------------------------------------------------------------
+__DEVICE__ float slog3_to_linear(float y) {
+    return (y >= 0.09f) ? (_powf(10.0f, (y - 0.5616868f) / 0.26968f) * 1.01f) - 0.01f : 2.637817f * (y - 0.09f) + 0.0105f;
+}
+
+__DEVICE__ float logc3_to_linear(float y) {
+    return (y >= 0.1496582f) ? (_powf(2.0f, (y - 0.385537f) / 0.0625f) - 1.0f) * 0.18f + 0.005f : (y - 0.096582f) / 5.0f;
+}
+
+__DEVICE__ float logc4_to_linear(float y) {
+    return (y >= 0.0798604f) ? (_powf(2.0f, (y - 0.4960307f) / 0.075936f) - 0.010543f) / 222.9562f : (y - 0.0798604f) / 1084.477f - 0.000188f;
+}
+
+__DEVICE__ float apple_log_to_linear(float y) {
+    if (y >= 0.208555f) {
+        return _powf(2.0f, (y - 0.69336945f) / 0.08550479f) - 0.00964052f;
+    } else {
+        return -0.05641088f + _sqrtf(_fmaxf(0.0f, y) / 47.28711236f);
+    }
+}
+
+__DEVICE__ float rec709_to_linear(float y) {
+    return _powf(_fmaxf(0.0f, y), 2.4f);
+}
+
+// DaVinci Intermediate Log conversion using natural logs (100% compilable)
+__DEVICE__ float linear_to_di(float x) {
+    float safe_x = (x < 0.0f) ? 0.0f : x;
+    return (_logf(safe_x + 0.0075f) / 0.693147f + 10.0f) / 15.0f;
+}
+
+// Inverse DaVinci Intermediate Log conversion back to scene-linear
+__DEVICE__ float di_to_linear(float y) {
+    return _powf(2.0f, y * 15.0f - 10.0f) - 0.0075f;
+}
+
+// Target Display gamma mapping (Gamma 2.4 / Rec.709 / Rec.2020)
+__DEVICE__ float linear_to_gamma24(float x) {
+    float safe_x = (x < 0.0f) ? 0.0f : x;
+    return _powf(safe_x, 1.0f / 2.4f);
+}
+
+// Target Display gamma mapping (Gamma 2.6 / DCI-P3)
+__DEVICE__ float linear_to_gamma26(float x) {
+    float safe_x = (x < 0.0f) ? 0.0f : x;
+    return _powf(safe_x, 1.0f / 2.6f);
+}
+
+// --------------------------------------------------------------------
+// Main DCTL Transform Entry Point
+// --------------------------------------------------------------------
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B) 
+{
+    float3 rgb = make_float3(p_R, p_G, p_B);
+
+    // ----------------------------------------------------------------
+    // INPUT COLOR SPACE CONVERSION (Auto-Decoding to DWG/DI)
+    // ----------------------------------------------------------------
+    if (input_space == SONY_SLOG3) {
+        float r_lin = slog3_to_linear(rgb.x);
+        float g_lin = slog3_to_linear(rgb.y);
+        float b_lin = slog3_to_linear(rgb.z);
+        
+        // S-Gamut3.Cine to DWG Gamut Mapping
+        float r_dwg = 0.99665004f * r_lin - 0.02673953f * g_lin + 0.03008948f * b_lin;
+        float g_dwg = 0.00896200f * r_lin + 0.92530063f * g_lin + 0.06573737f * b_lin;
+        float b_dwg = 0.06802042f * r_lin + 0.09770487f * g_lin + 0.83427471f * b_lin;
+        
+        rgb.x = linear_to_di(r_dwg);
+        rgb.y = linear_to_di(g_dwg);
+        rgb.z = linear_to_di(b_dwg);
+    } else if (input_space == ARRI_LOGC3) {
+        float r_lin = logc3_to_linear(rgb.x);
+        float g_lin = logc3_to_linear(rgb.y);
+        float b_lin = logc3_to_linear(rgb.z);
+        
+        // ARRI AWG3 to DWG Gamut Mapping
+        float r_dwg = 0.88505905f * r_lin + 0.10359396f * g_lin + 0.01134707f * b_lin;
+        float g_dwg = 0.06922668f * r_lin + 0.91943144f * g_lin + 0.01134190f * b_lin;
+        float b_dwg = 0.07536832f * r_lin + 0.05279615f * g_lin + 0.87183573f * b_lin;
+        
+        rgb.x = linear_to_di(r_dwg);
+        rgb.y = linear_to_di(g_dwg);
+        rgb.z = linear_to_di(b_dwg);
+    } else if (input_space == ARRI_LOGC4) {
+        float r_lin = logc4_to_linear(rgb.x);
+        float g_lin = logc4_to_linear(rgb.y);
+        float b_lin = logc4_to_linear(rgb.z);
+        
+        // ARRI AWG4 to DWG Gamut Mapping
+        float r_dwg = 0.99739594f * r_lin - 0.02316501f * g_lin + 0.02576908f * b_lin;
+        float g_dwg = -0.00918307f * r_lin + 0.91763203f * g_lin + 0.09155105f * b_lin;
+        float b_dwg = 0.07348799f * r_lin + 0.09370480f * g_lin + 0.83280721f * b_lin;
+        
+        rgb.x = linear_to_di(r_dwg);
+        rgb.y = linear_to_di(g_dwg);
+        rgb.z = linear_to_di(b_dwg);
+    } else if (input_space == APPLE_LOG) {
+        float r_lin = apple_log_to_linear(rgb.x);
+        float g_lin = apple_log_to_linear(rgb.y);
+        float b_lin = apple_log_to_linear(rgb.z);
+        
+        // BT.2020 to DWG Gamut Mapping (Apple Log uses Rec.2020 primaries)
+        float r_dwg = 0.89211211f * r_lin + 0.02436930f * g_lin + 0.08351867f * b_lin;
+        float g_dwg = 0.03261636f * r_lin + 0.78613744f * g_lin + 0.18124622f * b_lin;
+        float b_dwg = 0.06997703f * r_lin + 0.10474972f * g_lin + 0.82527344f * b_lin;
+        
+        rgb.x = linear_to_di(r_dwg);
+        rgb.y = linear_to_di(g_dwg);
+        rgb.z = linear_to_di(b_dwg);
+    } else if (input_space == REC709_AI) {
+        float r_lin = rec709_to_linear(rgb.x);
+        float g_lin = rec709_to_linear(rgb.y);
+        float b_lin = rec709_to_linear(rgb.z);
+        
+        // Rec.709 to DWG Gamut Mapping
+        float r_dwg = 0.56285696f * r_lin + 0.32350914f * g_lin + 0.11368869f * b_lin;
+        float g_dwg = 0.07776709f * r_lin + 0.74956007f * g_lin + 0.17262659f * b_lin;
+        float b_dwg = 0.06467950f * r_lin + 0.19199424f * g_lin + 0.74315377f * b_lin;
+        
+        rgb.x = linear_to_di(r_dwg);
+        rgb.y = linear_to_di(g_dwg);
+        rgb.z = linear_to_di(b_dwg);
+    }
+
+
+    // ----------------------------------------------------------------
+    // FILM PROFILE PRESET MAPPING (Tweakable Preset Architecture)
+    // ----------------------------------------------------------------
+    float active_contrast       = contrast;
+    float active_density_c      = density_c;
+    float active_density_m      = density_m;
+    float active_density_y      = density_y;
+    float active_saturation     = saturation;
+    float active_crosstalk_rg   = crosstalk_rg;
+    float active_crosstalk_rb   = crosstalk_rb;
+    float active_crosstalk_gb   = crosstalk_gb;
+    float active_skin_warm      = skin_warm;
+    float active_shadow_cool    = shadow_cool;
+    float active_halation       = halation;
+    float active_gate_bloom     = gate_bloom;
+    float active_highlight_roll  = highlight_roll;
+    float active_grain_amount   = grain_amount;
+    float active_grain_size     = grain_size;
+    float active_grain_sat      = grain_sat;
+    float active_grain_bias     = grain_bias;
+    float active_silver_flicker  = silver_flicker;
+    float active_hl_desat       = hl_desat;
+    float active_chroma_soft    = chroma_soft;
+    float active_gate_weave     = gate_weave;
+    float active_grain_seed     = grain_seed;
+
+    if (preset == KODAK_2383) {
+        // Kodak 2383: Heavy density, warm skin-crosstalk, cool shadow wash, subtle grain
+        active_contrast       = 1.22f * contrast;
+        active_density_c      = 0.35f + (density_c - 0.2f);
+        active_density_m      = 0.38f + (density_m - 0.2f);
+        active_density_y      = 0.30f + (density_y - 0.2f);
+        active_saturation     = 0.95f * saturation;
+        active_crosstalk_rg   = 0.07f + crosstalk_rg;
+        active_crosstalk_rb   = 0.02f + crosstalk_rb;
+        active_crosstalk_gb   = -0.04f + crosstalk_gb;
+        active_skin_warm      = 0.15f + skin_warm;
+        active_shadow_cool    = 0.30f + shadow_cool;          // Hollywood contrast shadows
+        active_halation       = 0.25f * (halation / 0.2f);
+        active_gate_bloom     = 0.20f * (gate_bloom / 0.1f);
+        active_highlight_roll  = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.12f * (grain_amount / 0.1f);
+        active_grain_size     = 1.20f * grain_size;
+        active_grain_sat      = 0.60f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.40f + grain_bias;
+        active_silver_flicker  = 0.15f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.40f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.15f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.20f * (gate_weave / 0.1f);
+    } else if (preset == FUJI_3513) {
+        // Fuji 3513: High contrast, emerald/cyan highlight crosstalk, coarser grain
+        active_contrast       = 1.28f * contrast;
+        active_density_c      = 0.40f + (density_c - 0.2f);
+        active_density_m      = 0.35f + (density_m - 0.2f);
+        active_density_y      = 0.38f + (density_y - 0.2f);
+        active_saturation     = 1.05f * saturation;
+        active_crosstalk_rg   = -0.05f + crosstalk_rg;
+        active_crosstalk_rb   = -0.02f + crosstalk_rb;
+        active_crosstalk_gb   = 0.08f + crosstalk_gb;
+        active_skin_warm      = -0.05f + skin_warm;
+        active_shadow_cool    = 0.20f + shadow_cool;
+        active_halation       = 0.20f * (halation / 0.2f);
+        active_gate_bloom     = 0.15f * (gate_bloom / 0.1f);
+        active_highlight_roll  = 0.25f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.15f * (grain_amount / 0.1f);
+        active_grain_size     = 1.40f * grain_size;
+        active_grain_sat      = 0.40f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.20f + grain_bias;
+        active_silver_flicker  = 0.10f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.30f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.10f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.15f * (gate_weave / 0.1f);
+    } else if (preset == KODAK_5219) {
+        // Kodak 5219 (500T): Creamy negative contrast, highly subtractive density, organic soft grain
+        active_contrast       = 0.85f * contrast;
+        active_density_c      = 0.48f + (density_c - 0.2f);
+        active_density_m      = 0.42f + (density_m - 0.2f);
+        active_density_y      = 0.45f + (density_y - 0.2f);
+        active_saturation     = 1.05f * saturation;
+        active_crosstalk_rg   = 0.02f + crosstalk_rg;
+        active_crosstalk_rb   = 0.04f + crosstalk_rb;
+        active_crosstalk_gb   = -0.02f + crosstalk_gb;
+        active_skin_warm      = 0.25f + skin_warm;            // Creamy skin tones
+        active_shadow_cool    = 0.10f + shadow_cool;
+        active_halation       = 0.35f * (halation / 0.2f);    // Noticeable halogen glow
+        active_gate_bloom     = 0.30f * (gate_bloom / 0.1f);  // Dynamic lens scatter
+        active_highlight_roll  = 0.45f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.18f * (grain_amount / 0.1f);
+        active_grain_size     = 1.50f * grain_size;
+        active_grain_sat      = 0.70f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.60f + grain_bias;
+        active_silver_flicker  = 0.20f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.60f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.35f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.35f * (gate_weave / 0.1f);
+    } else if (preset == AGFA_JT12) {
+        // Agfa JT 12.5 Print: Low density, stylized desaturated pastels, cooler shadows
+        active_contrast       = 1.15f * contrast;
+        active_density_c      = 0.25f + (density_c - 0.2f);
+        active_density_m      = 0.28f + (density_m - 0.2f);
+        active_density_y      = 0.32f + (density_y - 0.2f);
+        active_saturation     = 0.80f * saturation;
+        active_crosstalk_rg   = 0.05f + crosstalk_rg;
+        active_crosstalk_rb   = -0.06f + crosstalk_rb;
+        active_crosstalk_gb   = 0.04f + crosstalk_gb;
+        active_skin_warm      = 0.10f + skin_warm;
+        active_shadow_cool    = 0.25f + shadow_cool;
+        active_halation       = 0.15f * (halation / 0.2f);
+        active_gate_bloom     = 0.10f * (gate_bloom / 0.1f);
+        active_highlight_roll  = 0.20f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.10f * (grain_amount / 0.1f);
+        active_grain_size     = 1.00f * grain_size;
+        active_grain_sat      = 0.30f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.00f + grain_bias;
+        active_silver_flicker  = 0.08f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.50f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.08f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.10f * (gate_weave / 0.1f);
+    } else if (preset == FUJI_SUPERIA) {
+        // Fuji Superia 400: Emerald green bias, warm skin tones
+        active_contrast       = 0.95f * contrast;
+        active_density_c      = 0.32f + (density_c - 0.2f);
+        active_density_m      = 0.38f + (density_m - 0.2f);
+        active_density_y      = 0.35f + (density_y - 0.2f);
+        active_saturation     = 1.10f * saturation;
+        active_crosstalk_rg   = -0.08f + crosstalk_rg;
+        active_crosstalk_rb   = -0.04f + crosstalk_rb;
+        active_crosstalk_gb   = 0.06f + crosstalk_gb;
+        active_skin_warm      = 0.20f + skin_warm;
+        active_shadow_cool    = 0.15f + shadow_cool;
+        active_halation       = 0.30f * (halation / 0.2f);
+        active_gate_bloom     = 0.18f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.22f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.14f * (grain_amount / 0.1f);
+        active_grain_size     = 1.20f * grain_size;
+        active_grain_sat      = 0.50f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.30f + grain_bias;
+        active_silver_flicker = 0.12f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.35f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.25f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.25f * (gate_weave / 0.1f);
+    } else if (preset == EKTACHROME) {
+        // Ektachrome 100D Slide: Very high contrast, rich punchy slides, highlight-biased grain
+        active_contrast       = 1.40f * contrast;
+        active_density_c      = 0.48f + (density_c - 0.2f);
+        active_density_m      = 0.52f + (density_m - 0.2f);
+        active_density_y      = 0.50f + (density_y - 0.2f);
+        active_saturation     = 1.20f * saturation;
+        active_crosstalk_rg   = 0.02f + crosstalk_rg;
+        active_crosstalk_rb   = -0.04f + crosstalk_rb;
+        active_crosstalk_gb   = -0.02f + crosstalk_gb;
+        active_skin_warm      = 0.10f + skin_warm;
+        active_shadow_cool    = 0.05f + shadow_cool;
+        active_halation       = 0.10f * (halation / 0.2f);
+        active_gate_bloom     = 0.10f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.40f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.08f * (grain_amount / 0.1f);
+        active_grain_size     = 0.80f * grain_size;
+        active_grain_sat      = 0.50f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.60f + grain_bias;           // Highlight grain (Reversal)
+        active_silver_flicker = 0.05f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.10f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.05f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.12f * (gate_weave / 0.1f);
+    } else if (preset == TRIX_400) {
+        // Kodak Tri-X 400 B&W: Monochromatic high contrast, heavy textured B&W grain
+        active_contrast       = 1.30f * contrast;
+        active_density_c      = 0.00f;
+        active_density_m      = 0.00f;
+        active_density_y      = 0.00f;
+        active_saturation     = 0.00f;
+        active_crosstalk_rg   = 0.00f;
+        active_crosstalk_rb   = 0.00f;
+        active_crosstalk_gb   = 0.00f;
+        active_skin_warm      = 0.00f;
+        active_shadow_cool    = 0.00f;
+        active_halation       = 0.00f;
+        active_gate_bloom     = 0.15f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.35f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.22f * (grain_amount / 0.1f);
+        active_grain_size     = 1.60f * grain_size;
+        active_grain_sat      = 0.00f;
+        active_grain_bias     = -0.20f + grain_bias;
+        active_silver_flicker = 0.25f * (silver_flicker / 0.1f); // Gritty silver flicker
+        active_hl_desat       = 0.45f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.20f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.40f * (gate_weave / 0.1f);
+    } else if (preset == POLAROID) {
+        // Polaroid 600: Soft faded contrast, elevated shadows, golden-yellow wash
+        active_contrast       = 0.90f * contrast;
+        active_density_c      = 0.28f + (density_c - 0.2f);
+        active_density_m      = 0.25f + (density_m - 0.2f);
+        active_density_y      = 0.30f + (density_y - 0.2f);
+        active_saturation     = 0.85f * saturation;
+        active_crosstalk_rg   = 0.08f + crosstalk_rg;
+        active_crosstalk_rb   = 0.06f + crosstalk_rb;
+        active_crosstalk_gb   = 0.10f + crosstalk_gb;
+        active_skin_warm      = 0.30f + skin_warm;            // Warm golden instant look
+        active_shadow_cool   = -0.10f + shadow_cool;         // Faded yellow-wash shadows
+        active_halation      = 0.15f * (halation / 0.2f);
+        active_gate_bloom     = 0.25f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.16f * (grain_amount / 0.1f);
+        active_grain_size     = 1.80f * grain_size;
+        active_grain_sat      = 0.30f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.10f + grain_bias;
+        active_silver_flicker = 0.18f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.70f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.50f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.50f * (gate_weave / 0.1f);
+    } else if (preset == KODAK_250D) {
+        // Kodak Vision3 250D: Daylight balanced cinema film, beautiful pastel highlights, rich greens
+        active_contrast       = 1.02f * contrast;
+        active_density_c      = 0.35f + (density_c - 0.2f);
+        active_density_m      = 0.30f + (density_m - 0.2f);
+        active_density_y      = 0.38f + (density_y - 0.2f);
+        active_saturation     = 1.02f * saturation;
+        active_crosstalk_rg   = 0.03f + crosstalk_rg;
+        active_crosstalk_rb   = 0.00f + crosstalk_rb;
+        active_crosstalk_gb   = -0.02f + crosstalk_gb;
+        active_skin_warm      = 0.15f + skin_warm;
+        active_shadow_cool    = 0.05f + shadow_cool;
+        active_halation       = 0.20f * (halation / 0.2f);
+        active_gate_bloom     = 0.15f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.10f * (grain_amount / 0.1f);
+        active_grain_size     = 0.90f * grain_size;
+        active_grain_sat      = 0.50f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.30f + grain_bias;
+        active_silver_flicker = 0.10f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.30f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.15f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.15f * (gate_weave / 0.1f);
+    } else if (preset == FUJI_VELVIA) {
+        // Fuji Velvia 50: Extremely vivid slide film, punchy high contrast, rich saturated colors
+        active_contrast       = 1.45f * contrast;
+        active_density_c      = 0.50f + (density_c - 0.2f);
+        active_density_m      = 0.55f + (density_m - 0.2f);
+        active_density_y      = 0.48f + (density_y - 0.2f);
+        active_saturation     = 1.35f * saturation;
+        active_crosstalk_rg   = -0.04f + crosstalk_rg;
+        active_crosstalk_rb   = -0.02f + crosstalk_rb;
+        active_crosstalk_gb   = 0.08f + crosstalk_gb;
+        active_skin_warm      = -0.05f + skin_warm;
+        active_shadow_cool    = 0.10f + shadow_cool;
+        active_halation       = 0.05f * (halation / 0.2f);
+        active_gate_bloom     = 0.05f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.20f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.08f * (grain_amount / 0.1f);
+        active_grain_size     = 0.85f * grain_size;
+        active_grain_sat      = 0.60f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.40f + grain_bias;
+        active_silver_flicker = 0.05f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.15f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.05f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.08f * (gate_weave / 0.1f);
+    } else if (preset == KODACHROME) {
+        // Kodak Kodachrome 64: Legendary vintage slide film, warm yellow-red cast, retro nostalgic vibe
+        active_contrast       = 1.25f * contrast;
+        active_density_c      = 0.28f + (density_c - 0.2f);
+        active_density_m      = 0.45f + (density_m - 0.2f);
+        active_density_y      = 0.52f + (density_y - 0.2f);
+        active_saturation     = 0.90f * saturation;
+        active_crosstalk_rg   = 0.06f + crosstalk_rg;
+        active_crosstalk_rb   = 0.08f + crosstalk_rb;
+        active_crosstalk_gb   = -0.05f + crosstalk_gb;
+        active_skin_warm      = 0.25f + skin_warm;
+        active_shadow_cool    = -0.15f + shadow_cool;         // Golden-brown warm shadow shift
+        active_halation       = 0.18f * (halation / 0.2f);
+        active_gate_bloom     = 0.22f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.35f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.14f * (grain_amount / 0.1f);
+        active_grain_size     = 1.10f * grain_size;
+        active_grain_sat      = 0.40f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.10f + grain_bias;
+        active_silver_flicker = 0.12f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.40f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.20f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.18f * (gate_weave / 0.1f);
+    } else if (preset == ILFORD_HP5) {
+        // Ilford HP5 Plus 400: Classic fine-art monochrome film, soft contrast, rich silver grain
+        active_contrast       = 1.12f * contrast;
+        active_density_c      = 0.00f;
+        active_density_m      = 0.00f;
+        active_density_y      = 0.00f;
+        active_saturation     = 0.00f;
+        active_crosstalk_rg   = 0.00f;
+        active_crosstalk_rb   = 0.00f;
+        active_crosstalk_gb   = 0.00f;
+        active_skin_warm      = 0.00f;
+        active_shadow_cool    = 0.00f;
+        active_halation       = 0.00f;
+        active_gate_bloom     = 0.10f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.35f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.18f * (grain_amount / 0.1f);
+        active_grain_size     = 1.30f * grain_size;
+        active_grain_sat      = 0.00f;
+        active_grain_bias     = -0.10f + grain_bias;
+        active_silver_flicker = 0.15f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.30f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.12f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.20f * (gate_weave / 0.1f);
+    } else if (preset == CINESTILL_800T) {
+        // CineStill 800T: Tungsten balanced cinema look, cinematic cyan night cast, intense red halation
+        active_contrast       = 1.15f * contrast;
+        active_density_c      = 0.42f + (density_c - 0.2f);
+        active_density_m      = 0.28f + (density_m - 0.2f);
+        active_density_y      = 0.22f + (density_y - 0.2f);
+        active_saturation     = 1.10f * saturation;
+        active_crosstalk_rg   = -0.05f + crosstalk_rg;
+        active_crosstalk_rb   = 0.00f + crosstalk_rb;
+        active_crosstalk_gb   = 0.06f + crosstalk_gb;
+        active_skin_warm      = 0.05f + skin_warm;
+        active_shadow_cool    = 0.40f + shadow_cool;          // Heavy teal shadow wash
+        active_halation       = 0.75f * (halation / 0.2f);    // Heavy CineStill red halation glow
+        active_gate_bloom     = 0.45f * (gate_bloom / 0.1f);  // Intense light scatter
+        active_highlight_roll = 0.25f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.20f * (grain_amount / 0.1f);
+        active_grain_size     = 1.40f * grain_size;
+        active_grain_sat      = 0.50f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.40f + grain_bias;
+        active_silver_flicker = 0.20f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.50f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.30f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.30f * (gate_weave / 0.1f);
+    } else if (preset == KODAK_GOLD) {
+        // Kodak Gold 200: Warm golden consumer negative, saturated yellows/reds, warm sun-kissed skin
+        active_contrast       = 1.15f * contrast;
+        active_density_c      = 0.25f + (density_c - 0.2f);
+        active_density_m      = 0.35f + (density_m - 0.2f);
+        active_density_y      = 0.45f + (density_y - 0.2f);
+        active_saturation     = 1.10f * saturation;
+        active_crosstalk_rg   = 0.08f + crosstalk_rg;
+        active_crosstalk_rb   = 0.05f + crosstalk_rb;
+        active_crosstalk_gb   = -0.04f + crosstalk_gb;
+        active_skin_warm      = 0.35f + skin_warm;
+        active_shadow_cool    = -0.05f + shadow_cool;
+        active_halation       = 0.10f * (halation / 0.2f);
+        active_gate_bloom     = 0.15f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.16f * (grain_amount / 0.1f);
+        active_grain_size     = 1.25f * grain_size;
+        active_grain_sat      = 0.45f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.10f + grain_bias;
+        active_silver_flicker = 0.12f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.25f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.10f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.15f * (gate_weave / 0.1f);
+    } else if (preset == PORTRA_400) {
+        // Kodak Portra 400: The wedding and portrait gold standard, beautiful pastel creamy skin tones
+        active_contrast       = 0.90f * contrast;
+        active_density_c      = 0.28f + (density_c - 0.2f);
+        active_density_m      = 0.32f + (density_m - 0.2f);
+        active_density_y      = 0.34f + (density_y - 0.2f);
+        active_saturation     = 0.95f * saturation;
+        active_crosstalk_rg   = 0.04f + crosstalk_rg;
+        active_crosstalk_rb   = 0.02f + crosstalk_rb;
+        active_crosstalk_gb   = -0.02f + crosstalk_gb;
+        active_skin_warm      = 0.25f + skin_warm;
+        active_shadow_cool    = 0.00f + shadow_cool;
+        active_halation       = 0.15f * (halation / 0.2f);
+        active_gate_bloom     = 0.10f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.45f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.09f * (grain_amount / 0.1f);
+        active_grain_size     = 0.90f * grain_size;
+        active_grain_sat      = 0.40f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.30f + grain_bias;
+        active_silver_flicker = 0.08f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.35f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.20f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.10f * (gate_weave / 0.1f);
+    } else if (preset == PORTRA_160) {
+        // Kodak Portra 160: Extremely low contrast, elegant fashion pastel tones, ultra-fine grain
+        active_contrast       = 0.85f * contrast;
+        active_density_c      = 0.24f + (density_c - 0.2f);
+        active_density_m      = 0.28f + (density_m - 0.2f);
+        active_density_y      = 0.28f + (density_y - 0.2f);
+        active_saturation     = 0.90f * saturation;
+        active_crosstalk_rg   = 0.02f + crosstalk_rg;
+        active_crosstalk_rb   = 0.01f + crosstalk_rb;
+        active_crosstalk_gb   = -0.01f + crosstalk_gb;
+        active_skin_warm      = 0.20f + skin_warm;
+        active_shadow_cool    = 0.00f + shadow_cool;
+        active_halation       = 0.10f * (halation / 0.2f);
+        active_gate_bloom     = 0.08f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.50f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.06f * (grain_amount / 0.1f);
+        active_grain_size     = 0.75f * grain_size;
+        active_grain_sat      = 0.35f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.40f + grain_bias;
+        active_silver_flicker = 0.05f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.40f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.25f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.08f * (gate_weave / 0.1f);
+    } else if (preset == EKTAR_100) {
+        // Kodak Ektar 100: The world's finest grain color negative, ultra-vivid primary saturation, landscapes
+        active_contrast       = 1.28f * contrast;
+        active_density_c      = 0.48f + (density_c - 0.2f);
+        active_density_m      = 0.46f + (density_m - 0.2f);
+        active_density_y      = 0.45f + (density_y - 0.2f);
+        active_saturation     = 1.25f * saturation;
+        active_crosstalk_rg   = -0.05f + crosstalk_rg;
+        active_crosstalk_rb   = -0.02f + crosstalk_rb;
+        active_crosstalk_gb   = 0.06f + crosstalk_gb;
+        active_skin_warm      = 0.10f + skin_warm;
+        active_shadow_cool    = 0.12f + shadow_cool;
+        active_halation       = 0.15f * (halation / 0.2f);
+        active_gate_bloom     = 0.10f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.25f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.08f * (grain_amount / 0.1f);
+        active_grain_size     = 0.80f * grain_size;
+        active_grain_sat      = 0.60f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.10f + grain_bias;
+        active_silver_flicker = 0.06f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.20f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.10f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.10f * (gate_weave / 0.1f);
+    } else if (preset == CINESTILL_50D) {
+        // CineStill 50D: Daylight balanced cinema negative (Vision3 50D), fine grain, subtle red halation
+        active_contrast       = 1.05f * contrast;
+        active_density_c      = 0.30f + (density_c - 0.2f);
+        active_density_m      = 0.25f + (density_m - 0.2f);
+        active_density_y      = 0.32f + (density_y - 0.2f);
+        active_saturation     = 1.05f * saturation;
+        active_crosstalk_rg   = 0.03f + crosstalk_rg;
+        active_crosstalk_rb   = 0.01f + crosstalk_rb;
+        active_crosstalk_gb   = -0.02f + crosstalk_gb;
+        active_skin_warm      = 0.15f + skin_warm;
+        active_shadow_cool    = 0.10f + shadow_cool;
+        active_halation       = 0.40f * (halation / 0.2f);    // Moderate red halation (remjet layer removed)
+        active_gate_bloom     = 0.20f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.07f * (grain_amount / 0.1f);
+        active_grain_size     = 0.80f * grain_size;
+        active_grain_sat      = 0.40f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.30f + grain_bias;
+        active_silver_flicker = 0.08f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.30f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.15f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.12f * (gate_weave / 0.1f);
+    } else if (preset == FUJI_PRO400H) {
+        // Fuji Pro 400H: Gorgeous wedding look, beautiful pastel greens and blues, cool skin undertones
+        active_contrast       = 0.92f * contrast;
+        active_density_c      = 0.38f + (density_c - 0.2f);
+        active_density_m      = 0.24f + (density_m - 0.2f);
+        active_density_y      = 0.28f + (density_y - 0.2f);
+        active_saturation     = 1.05f * saturation;
+        active_crosstalk_rg   = -0.08f + crosstalk_rg;
+        active_crosstalk_rb   = -0.04f + crosstalk_rb;
+        active_crosstalk_gb   = 0.08f + crosstalk_gb;
+        active_skin_warm      = -0.10f + skin_warm;           // Pastel pink-creamy skin shift
+        active_shadow_cool    = 0.25f + shadow_cool;          // Airy cyan shadow wash
+        active_halation       = 0.15f * (halation / 0.2f);
+        active_gate_bloom     = 0.12f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.40f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.11f * (grain_amount / 0.1f);
+        active_grain_size     = 1.05f * grain_size;
+        active_grain_sat      = 0.55f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.20f + grain_bias;
+        active_silver_flicker = 0.10f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.35f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.20f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.15f * (gate_weave / 0.1f);
+    } else if (preset == ASTIA_100F) {
+        // Fuji Astia 100F: Balanced daylight slide, realistic colors, soft beautiful skin tones
+        active_contrast       = 1.18f * contrast;
+        active_density_c      = 0.32f + (density_c - 0.2f);
+        active_density_m      = 0.34f + (density_m - 0.2f);
+        active_density_y      = 0.30f + (density_y - 0.2f);
+        active_saturation     = 1.00f * saturation;
+        active_crosstalk_rg   = -0.02f + crosstalk_rg;
+        active_crosstalk_rb   = 0.00f + crosstalk_rb;
+        active_crosstalk_gb   = 0.02f + crosstalk_gb;
+        active_skin_warm      = 0.08f + skin_warm;
+        active_shadow_cool    = 0.05f + shadow_cool;
+        active_halation       = 0.08f * (halation / 0.2f);
+        active_gate_bloom     = 0.08f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.08f * (grain_amount / 0.1f);
+        active_grain_size     = 0.85f * grain_size;
+        active_grain_sat      = 0.40f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.00f + grain_bias;
+        active_silver_flicker = 0.08f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.20f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.10f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.10f * (gate_weave / 0.1f);
+    } else if (preset == PROVIA_100F) {
+        // Fuji Provia 100F: Standard daylight slide, crisp contrast, rich primary blues and greens
+        active_contrast       = 1.25f * contrast;
+        active_density_c      = 0.38f + (density_c - 0.2f);
+        active_density_m      = 0.38f + (density_m - 0.2f);
+        active_density_y      = 0.35f + (density_y - 0.2f);
+        active_saturation     = 1.15f * saturation;
+        active_crosstalk_rg   = -0.04f + crosstalk_rg;
+        active_crosstalk_rb   = -0.02f + crosstalk_rb;
+        active_crosstalk_gb   = 0.04f + crosstalk_gb;
+        active_skin_warm      = 0.02f + skin_warm;
+        active_shadow_cool    = 0.15f + shadow_cool;          // Rich cool-blue shadow wash
+        active_halation       = 0.08f * (halation / 0.2f);
+        active_gate_bloom     = 0.08f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.25f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.09f * (grain_amount / 0.1f);
+        active_grain_size     = 0.90f * grain_size;
+        active_grain_sat      = 0.45f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.20f + grain_bias;
+        active_silver_flicker = 0.08f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.20f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.10f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.10f * (gate_weave / 0.1f);
+    } else if (preset == VISTA_400) {
+        // Agfaphoto Vista 400: Punchy, saturated consumer negative, highly vivid primary reds
+        active_contrast       = 1.20f * contrast;
+        active_density_c      = 0.32f + (density_c - 0.2f);
+        active_density_m      = 0.48f + (density_m - 0.2f);
+        active_density_y      = 0.38f + (density_y - 0.2f);
+        active_saturation     = 1.18f * saturation;
+        active_crosstalk_rg   = 0.10f + crosstalk_rg;
+        active_crosstalk_rb   = 0.04f + crosstalk_rb;
+        active_crosstalk_gb   = -0.06f + crosstalk_gb;
+        active_skin_warm      = 0.20f + skin_warm;
+        active_shadow_cool    = 0.08f + shadow_cool;
+        active_halation       = 0.20f * (halation / 0.2f);
+        active_gate_bloom     = 0.15f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.18f * (grain_amount / 0.1f);
+        active_grain_size     = 1.30f * grain_size;
+        active_grain_sat      = 0.50f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.20f + grain_bias;
+        active_silver_flicker = 0.15f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.30f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.15f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.20f * (gate_weave / 0.1f);
+    } else if (preset == LOMO_800) {
+        // Lomography CN 800: Saturated retro warm consumer look, moody warm shadows, heavy grain
+        active_contrast       = 1.22f * contrast;
+        active_density_c      = 0.28f + (density_c - 0.2f);
+        active_density_m      = 0.40f + (density_m - 0.2f);
+        active_density_y      = 0.48f + (density_y - 0.2f);
+        active_saturation     = 1.12f * saturation;
+        active_crosstalk_rg   = 0.08f + crosstalk_rg;
+        active_crosstalk_rb   = 0.06f + crosstalk_rb;
+        active_crosstalk_gb   = -0.04f + crosstalk_gb;
+        active_skin_warm      = 0.30f + skin_warm;
+        active_shadow_cool    = -0.08f + shadow_cool;         // Moody golden shadow wash
+        active_halation       = 0.35f * (halation / 0.2f);
+        active_gate_bloom     = 0.25f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.28f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.22f * (grain_amount / 0.1f);
+        active_grain_size     = 1.50f * grain_size;
+        active_grain_sat      = 0.55f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.30f + grain_bias;
+        active_silver_flicker = 0.20f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.35f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.25f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.30f * (gate_weave / 0.1f);
+    } else if (preset == METROPOLIS) {
+        // Lomography Metropolis: Deep desaturated contrast, muted greens/yellows, cold gray street look
+        active_contrast       = 1.35f * contrast;
+        active_density_c      = 0.48f + (density_c - 0.2f);
+        active_density_m      = 0.15f + (density_m - 0.2f);
+        active_density_y      = 0.18f + (density_y - 0.2f);
+        active_saturation     = 0.65f * saturation;
+        active_crosstalk_rg   = -0.10f + crosstalk_rg;
+        active_crosstalk_rb   = -0.08f + crosstalk_rb;
+        active_crosstalk_gb   = 0.04f + crosstalk_gb;
+        active_skin_warm      = -0.15f + skin_warm;           // Cold skin tones
+        active_shadow_cool    = 0.30f + shadow_cool;          // Cold gray shadow wash
+        active_halation       = 0.10f * (halation / 0.2f);
+        active_gate_bloom     = 0.10f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.20f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.24f * (grain_amount / 0.1f);
+        active_grain_size     = 1.45f * grain_size;
+        active_grain_sat      = 0.30f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.40f + grain_bias;
+        active_silver_flicker = 0.18f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.45f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.15f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.25f * (gate_weave / 0.1f);
+    } else if (preset == LOMO_PURPLE) {
+        // Lomography Purple: false-color dreamscape, shifts greens to deep purple while keeping skin warm
+        active_contrast       = 1.18f * contrast;
+        active_density_c      = 0.50f + (density_c - 0.2f);
+        active_density_m      = 0.10f + (density_m - 0.2f);
+        active_density_y      = 0.40f + (density_y - 0.2f);
+        active_saturation     = 1.10f * saturation;
+        active_crosstalk_rg   = -0.15f + crosstalk_rg;
+        active_crosstalk_rb   = 0.05f + crosstalk_rb;
+        active_crosstalk_gb   = -0.20f + crosstalk_gb;        // Extreme shift greens to violet-purple
+        active_skin_warm      = 0.20f + skin_warm;            // Orange skin remains warm
+        active_shadow_cool    = 0.35f + shadow_cool;          // Deep violet-blue shadows
+        active_halation       = 0.25f * (halation / 0.2f);
+        active_gate_bloom     = 0.20f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.20f * (grain_amount / 0.1f);
+        active_grain_size     = 1.35f * grain_size;
+        active_grain_sat      = 0.60f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.20f + grain_bias;
+        active_silver_flicker = 0.15f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.35f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.25f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.25f * (gate_weave / 0.1f);
+    } else if (preset == ORWO_UN54) {
+        // ORWO UN54: Historic B&W Cinema Movie Film, rich silver midtones, organic gritty grain
+        active_contrast       = 1.15f * contrast;
+        active_density_c      = 0.00f;
+        active_density_m      = 0.00f;
+        active_density_y      = 0.00f;
+        active_saturation     = 0.00f;
+        active_crosstalk_rg   = 0.00f;
+        active_crosstalk_rb   = 0.00f;
+        active_crosstalk_gb   = 0.00f;
+        active_skin_warm      = 0.00f;
+        active_shadow_cool    = 0.00f;
+        active_halation       = 0.00f;
+        active_gate_bloom     = 0.10f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.40f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.20f * (grain_amount / 0.1f);
+        active_grain_size     = 1.40f * grain_size;
+        active_grain_sat      = 0.00f;
+        active_grain_bias     = -0.15f + grain_bias;
+        active_silver_flicker = 0.20f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.35f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.15f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.30f * (gate_weave / 0.1f);
+    } else if (preset == FOMAPAN_100) {
+        // Fomapan 100: Czech retro high contrast B&W film, deep shadow density, vintage grain
+        active_contrast       = 1.28f * contrast;
+        active_density_c      = 0.00f;
+        active_density_m      = 0.00f;
+        active_density_y      = 0.00f;
+        active_saturation     = 0.00f;
+        active_crosstalk_rg   = 0.00f;
+        active_crosstalk_rb   = 0.00f;
+        active_crosstalk_gb   = 0.00f;
+        active_skin_warm      = 0.00f;
+        active_shadow_cool    = 0.00f;
+        active_halation       = 0.00f;
+        active_gate_bloom     = 0.08f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.20f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.16f * (grain_amount / 0.1f);
+        active_grain_size     = 1.20f * grain_size;
+        active_grain_sat      = 0.00f;
+        active_grain_bias     = -0.10f + grain_bias;
+        active_silver_flicker = 0.12f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.25f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.10f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.15f * (gate_weave / 0.1f);
+    } else if (preset == DELTA_3200) {
+        // Ilford Delta 3200: Extreme speed B&W film, massive chunky grain texture, highly moody
+        active_contrast       = 0.95f * contrast;
+        active_density_c      = 0.00f;
+        active_density_m      = 0.00f;
+        active_density_y      = 0.00f;
+        active_saturation     = 0.00f;
+        active_crosstalk_rg   = 0.00f;
+        active_crosstalk_rb   = 0.00f;
+        active_crosstalk_gb   = 0.00f;
+        active_skin_warm      = 0.00f;
+        active_shadow_cool    = 0.00f;
+        active_halation       = 0.00f;
+        active_gate_bloom     = 0.30f * (gate_bloom / 0.1f);  // Heavy highlight bloom
+        active_highlight_roll = 0.50f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.35f * (grain_amount / 0.1f); // Extreme grain texture
+        active_grain_size     = 2.20f * grain_size;
+        active_grain_sat      = 0.00f;
+        active_grain_bias     = -0.30f + grain_bias;
+        active_silver_flicker = 0.30f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.40f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.35f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.40f * (gate_weave / 0.1f);
+    } else if (preset == AEROCHROME) {
+        // Kodak Aerochrome: false-color Infrared film, shifts green foliage into hot magentas/reds
+        active_contrast       = 1.25f * contrast;
+        active_density_c      = 0.10f + (density_c - 0.2f);
+        active_density_m      = 0.65f + (density_m - 0.2f);
+        active_density_y      = 0.20f + (density_y - 0.2f);
+        active_saturation     = 1.28f * saturation;
+        active_crosstalk_rg   = 0.18f + crosstalk_rg;
+        active_crosstalk_rb   = -0.15f + crosstalk_rb;
+        active_crosstalk_gb   = -0.18f + crosstalk_gb;        // Shifts green colors to intense hot crimson reds
+        active_skin_warm      = 0.15f + skin_warm;
+        active_shadow_cool    = 0.20f + shadow_cool;          // Rich deep blue shadow shift
+        active_halation       = 0.35f * (halation / 0.2f);    // Infrared glowing halation
+        active_gate_bloom     = 0.25f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.35f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.12f * (grain_amount / 0.1f);
+        active_grain_size     = 1.05f * grain_size;
+        active_grain_sat      = 0.50f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.00f + grain_bias;
+        active_silver_flicker = 0.15f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.25f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.20f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.20f * (gate_weave / 0.1f);
+    } else if (preset == TECHNICOLOR_2STRIP) {
+        // Technicolor 2-Strip: Vintage 1920s cinema format, strips out blues, warm red/orange and cool cyan/green
+        active_contrast       = 1.20f * contrast;
+        active_density_c      = 0.45f + (density_c - 0.2f);
+        active_density_m      = 0.35f + (density_m - 0.2f);
+        active_density_y      = 0.00f;                        // Strip yellow-blue layer
+        active_saturation     = 1.05f * saturation;
+        active_crosstalk_rg   = 0.15f + crosstalk_rg;
+        active_crosstalk_rb   = -0.20f + crosstalk_rb;
+        active_crosstalk_gb   = -0.20f + crosstalk_gb;        // Eliminate blues, split into red/cyan vectors
+        active_skin_warm      = 0.40f + skin_warm;            // Rich clay terracotta skin look
+        active_shadow_cool    = 0.30f + shadow_cool;          // Retro cyan-teal shadows
+        active_halation       = 0.20f * (halation / 0.2f);
+        active_gate_bloom     = 0.25f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.30f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.18f * (grain_amount / 0.1f);
+        active_grain_size     = 1.50f * grain_size;
+        active_grain_sat      = 0.30f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.20f + grain_bias;
+        active_silver_flicker = 0.20f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.30f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.25f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.30f * (gate_weave / 0.1f);
+    } else if (preset == IMAX_1570_CLEAN) {
+        // IMAX 15/70 Clean: dense large-format contrast, protected whites, almost no texture drift
+        active_contrast       = 1.20f * contrast;
+        active_density_c      = 0.18f + (density_c - 0.2f) * 0.35f;
+        active_density_m      = 0.20f + (density_m - 0.2f) * 0.35f;
+        active_density_y      = 0.17f + (density_y - 0.2f) * 0.35f;
+        active_saturation     = 1.03f * saturation;
+        active_crosstalk_rg   = 0.01f + crosstalk_rg * 0.25f;
+        active_crosstalk_rb   = 0.00f + crosstalk_rb * 0.25f;
+        active_crosstalk_gb   = 0.02f + crosstalk_gb * 0.25f;
+        active_skin_warm      = 0.08f + skin_warm * 0.35f;
+        active_shadow_cool    = 0.12f + shadow_cool * 0.35f;
+        active_halation       = 0.05f * (halation / 0.2f);
+        active_gate_bloom     = 0.05f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.70f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.02f * (grain_amount / 0.1f);
+        active_grain_size     = 0.65f * grain_size;
+        active_grain_sat      = 0.20f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.10f + grain_bias * 0.25f;
+        active_silver_flicker = 0.02f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.55f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.04f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.02f * (gate_weave / 0.1f);
+    } else if (preset == IMAX_DLF_CLEAN) {
+        // IMAX DLF Clean: polished digital large-format contrast with very controlled texture
+        active_contrast       = 1.18f * contrast;
+        active_density_c      = 0.16f + (density_c - 0.2f) * 0.25f;
+        active_density_m      = 0.18f + (density_m - 0.2f) * 0.25f;
+        active_density_y      = 0.16f + (density_y - 0.2f) * 0.25f;
+        active_saturation     = 1.08f * saturation;
+        active_crosstalk_rg   = -0.01f + crosstalk_rg * 0.20f;
+        active_crosstalk_rb   = 0.00f + crosstalk_rb * 0.20f;
+        active_crosstalk_gb   = 0.02f + crosstalk_gb * 0.20f;
+        active_skin_warm      = 0.06f + skin_warm * 0.30f;
+        active_shadow_cool    = 0.18f + shadow_cool * 0.30f;
+        active_halation       = 0.02f * (halation / 0.2f);
+        active_gate_bloom     = 0.03f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.80f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.00f;
+        active_grain_size     = 0.60f * grain_size;
+        active_grain_sat      = 0.00f;
+        active_grain_bias     = 0.00f;
+        active_silver_flicker = 0.00f;
+        active_hl_desat       = 0.60f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.03f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.00f;
+    } else if (preset == IMAX_NIGHT) {
+        // IMAX Night: deep clean blacks, cool large-format shadows, smooth hot light roll-off
+        active_contrast       = 1.25f * contrast;
+        active_density_c      = 0.20f + (density_c - 0.2f) * 0.30f;
+        active_density_m      = 0.18f + (density_m - 0.2f) * 0.30f;
+        active_density_y      = 0.14f + (density_y - 0.2f) * 0.30f;
+        active_saturation     = 0.95f * saturation;
+        active_crosstalk_rg   = -0.03f + crosstalk_rg * 0.25f;
+        active_crosstalk_rb   = 0.01f + crosstalk_rb * 0.25f;
+        active_crosstalk_gb   = 0.07f + crosstalk_gb * 0.25f;
+        active_skin_warm      = 0.04f + skin_warm * 0.30f;
+        active_shadow_cool    = 0.35f + shadow_cool * 0.35f;
+        active_halation       = 0.08f * (halation / 0.2f);
+        active_gate_bloom     = 0.12f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.85f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.03f * (grain_amount / 0.1f);
+        active_grain_size     = 0.70f * grain_size;
+        active_grain_sat      = 0.15f * (grain_sat / 0.5f);
+        active_grain_bias     = -0.25f + grain_bias * 0.25f;
+        active_silver_flicker = 0.02f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.75f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.03f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.02f * (gate_weave / 0.1f);
+    } else if (preset == IMAX_WARM_PRINT) {
+        // IMAX Warm Print: clean large-format scale with a restrained warm photochemical print bias
+        active_contrast       = 1.15f * contrast;
+        active_density_c      = 0.22f + (density_c - 0.2f) * 0.35f;
+        active_density_m      = 0.24f + (density_m - 0.2f) * 0.35f;
+        active_density_y      = 0.20f + (density_y - 0.2f) * 0.35f;
+        active_saturation     = 1.02f * saturation;
+        active_crosstalk_rg   = 0.04f + crosstalk_rg * 0.25f;
+        active_crosstalk_rb   = 0.01f + crosstalk_rb * 0.25f;
+        active_crosstalk_gb   = -0.02f + crosstalk_gb * 0.25f;
+        active_skin_warm      = 0.22f + skin_warm * 0.35f;
+        active_shadow_cool    = 0.08f + shadow_cool * 0.30f;
+        active_halation       = 0.06f * (halation / 0.2f);
+        active_gate_bloom     = 0.05f * (gate_bloom / 0.1f);
+        active_highlight_roll = 0.65f * (highlight_roll / 0.2f);
+        active_grain_amount   = 0.025f * (grain_amount / 0.1f);
+        active_grain_size     = 0.65f * grain_size;
+        active_grain_sat      = 0.20f * (grain_sat / 0.5f);
+        active_grain_bias     = 0.00f + grain_bias * 0.25f;
+        active_silver_flicker = 0.02f * (silver_flicker / 0.1f);
+        active_hl_desat       = 0.55f * (hl_desat / 0.2f);
+        active_chroma_soft    = 0.04f * (chroma_soft / 0.1f);
+        active_gate_weave     = 0.02f * (gate_weave / 0.1f);
+    }
+
+    // 1. LUMINANZ BERECHNEN (Basierend auf REC.2020 / DWG Konstanten)
+    float luma = 0.2627f * rgb.x + 0.6780f * rgb.y + 0.0593f * rgb.z;
+
+    // 1.5 ADVANCED CHROMA EDGE SOFTENING (Analog Bleed)
+    // Applied at the very start to break up pixel-perfect sharp digital boundaries
+    if (active_chroma_soft > 0.0f) {
+        float dev = _fabs(rgb.x - rgb.y) + _fabs(rgb.y - rgb.z);
+        float edge_hash = hash3d(p_X, p_Y, 99) - 0.5f;
+        float bleed = dev * active_chroma_soft * 0.04f * edge_hash;
+        rgb.x -= bleed * 0.5f;
+        rgb.y += bleed * 0.3f;
+        rgb.z += bleed * 0.2f;
+    }
+
+    // 2. SUBTRACTIVE CMY DYE LAYER DENSITY (Hollywood Emulation of Subtractive Impurity)
+    // Emulates Cyan (absorbing Red), Magenta (absorbing Green), and Yellow (absorbing Blue).
+    // Calculates absolute distance of each primary from luminance, and reduces it proportionally.
+    if (luma > 0.0f) {
+        float dev_r = _fabs(rgb.x - luma);
+        float dev_g = _fabs(rgb.y - luma);
+        float dev_b = _fabs(rgb.z - luma);
+        
+        // Red is absorbed by Cyan dye buildup
+        rgb.x *= 1.0f - (dev_r * active_density_c * 0.5f);
+        // Green is absorbed by Magenta dye buildup
+        rgb.y *= 1.0f - (dev_g * active_density_m * 0.5f);
+        // Blue is absorbed by Yellow dye buildup
+        rgb.z *= 1.0f - (dev_b * active_density_y * 0.5f);
+    }
+
+    // 2.3 HOLLYWOOD LOCALIZED 3D HSL WARP (Skin-selective warming & Shadow-selective cooling)
+    // Runs inside DaVinci Intermediate log space. Preserves neutrals beautifully.
+    {
+        // Safe luma clamp
+        float clamped_luma = (luma < 0.0f) ? 0.0f : ((luma > 1.0f) ? 1.0f : luma);
+        
+        // A. Skin Tone Selector Key: Skin tones reside in the peach/orange hue region (R > G > B)
+        // Computes a soft, robust weight based on primary separation
+        float skin_diff_rg = rgb.x - rgb.y;
+        float skin_diff_gb = rgb.y - rgb.z;
+        float skin_weight = 0.0f;
+        if (skin_diff_rg > 0.0f && skin_diff_gb > 0.0f) {
+            float norm = rgb.x * rgb.x + 0.001f;
+            skin_weight = (skin_diff_rg * skin_diff_gb) / norm;
+            skin_weight = (skin_weight > 1.0f) ? 1.0f : skin_weight;
+        }
+        
+        // Apply localized skin tone warmth warp: shift towards gold/red and desaturate blue
+        if (active_skin_warm != 0.0f && skin_weight > 0.0f) {
+            rgb.x += 0.04f * active_skin_warm * skin_weight;
+            rgb.y += 0.01f * active_skin_warm * skin_weight;
+            rgb.z -= 0.02f * active_skin_warm * skin_weight;
+        }
+        
+        // B. Shadow Cooling Selector Key: Peaks in shadows, fades out in midtones
+        float shadow_weight = (1.0f - clamped_luma) * (1.0f - clamped_luma);
+        
+        // Apply localized shadow cooling warp: shift shadows towards filmic teal/blue
+        if (active_shadow_cool != 0.0f) {
+            rgb.z += 0.03f * active_shadow_cool * shadow_weight;
+            rgb.y += 0.005f * active_shadow_cool * shadow_weight; // Add a touch of green for teal balance
+            rgb.x -= 0.015f * active_shadow_cool * shadow_weight;
+        }
+    }
+
+    // 2.5 SUBTRACTIVE FILM DYE CROSSTALK (Impurity Emulation of Analog Layers)
+    // Mixes colors inside DWG. Row-sum normalized to 1.0 to preserve neutrals exactly.
+    float r_mix = (1.0f - active_crosstalk_rg - active_crosstalk_rb) * rgb.x + active_crosstalk_rg * rgb.y + active_crosstalk_rb * rgb.z;
+    float g_mix = active_crosstalk_rg * 0.5f * rgb.x + (1.0f - active_crosstalk_rg * 0.5f - active_crosstalk_gb) * rgb.y + active_crosstalk_gb * rgb.z;
+    float b_mix = active_crosstalk_rb * 0.5f * rgb.x + active_crosstalk_gb * 0.5f * rgb.y + (1.0f - active_crosstalk_rb * 0.5f - active_crosstalk_gb * 0.5f) * rgb.z;
+    rgb = make_float3(r_mix, g_mix, b_mix);
+
+    // 3. SCENE-REAKTIVER KONTRAST (Sigmoid / S-Kurve im Log-Raum)
+    // Ein sanfter mathematischer Roll-off, der Highlights schützt und Schatten nicht absaufen lässt
+    if (active_contrast != 1.0f) {
+        // Pivot-Punkt auf ca. 18% Grau im Log-Raum ansetzen (DWG Intermediate Mitte liegt bei ~0.34)
+        float pivot = 0.336f; 
+        
+        rgb.x = pivot + _powf(_fmaxf(0.0f, rgb.x / pivot), active_contrast) * pivot - pivot;
+        rgb.y = pivot + _powf(_fmaxf(0.0f, rgb.y / pivot), active_contrast) * pivot - pivot;
+        rgb.z = pivot + _powf(_fmaxf(0.0f, rgb.z / pivot), active_contrast) * pivot - pivot;
+    }
+
+    // 4. GLOBALE SÄTTIGUNGS-ANPASSUNG (Linearer Shift)
+    luma = 0.2627f * rgb.x + 0.6780f * rgb.y + 0.0593f * rgb.z;
+    rgb.x = luma + active_saturation * (rgb.x - luma);
+    rgb.y = luma + active_saturation * (rgb.y - luma);
+    rgb.z = luma + active_saturation * (rgb.z - luma);
+
+    // 4.5 SUBTRACTIVE DYE HALATION EMULATION (Highlight Orange-Red Bloom)
+    // Runs in DWG intermediate log-space.
+    if (active_halation > 0.0f) {
+        // Safe luma clamp using fast conditional branching
+        float clamped_luma = (luma < 0.0f) ? 0.0f : ((luma > 1.0f) ? 1.0f : luma);
+        
+        // Generate highlight key mask that starts at 0.336 luma (18% gray pivot) and grows quadratically to 1.0 at 0.486
+        float hal_mask = _powf(_fminf(1.0f, _fmaxf(0.0f, (clamped_luma - 0.336f) / 0.15f)), 2.0f);
+        
+        // Boost Red and Green channels inside highlight mask to generate the warm orange halation bloom
+        rgb.x += 0.30f * active_halation * hal_mask;
+        rgb.y += 0.09f * active_halation * hal_mask;
+    }
+
+    // 4.6 HIGHLIGHT LENS GATE BLOOM EMULATION
+    // Replicates photographic light scatter on the silver halide emulsion.
+    if (active_gate_bloom > 0.0f) {
+        float clamped_luma = (luma < 0.0f) ? 0.0f : ((luma > 1.0f) ? 1.0f : luma);
+        
+        // Highlights-only mask (threshold at 0.36 luma, grows quadratically to 1.0 at 0.50)
+        float bloom_mask = _powf(_fminf(1.0f, _fmaxf(0.0f, (clamped_luma - 0.36f) / 0.14f)), 2.0f);
+        
+        // Emulate soft highlight flare with a highly aesthetic golden-orange wash
+        rgb.x += 0.22f * active_gate_bloom * bloom_mask;
+        rgb.y += 0.12f * active_gate_bloom * bloom_mask;
+        rgb.z += 0.04f * active_gate_bloom * bloom_mask;
+    }
+
+    // 4.7 CINEMATIC HIGHLIGHT SOFT ROLL-OFF (Shoulder Compand Curve)
+    // Smoothly compresses high-exposure values asymptotically into paper-white to prevent digital clipping.
+    if (active_highlight_roll > 0.0f) {
+        // Set the roll-off knee point. DWG 18% gray is 0.336f, display white is at ~0.50f.
+        float knee = 0.42f; 
+        
+        if (rgb.x > knee) {
+            rgb.x = knee + (rgb.x - knee) / (1.0f + (rgb.x - knee) * active_highlight_roll * 10.0f);
+        }
+        if (rgb.y > knee) {
+            rgb.y = knee + (rgb.y - knee) / (1.0f + (rgb.y - knee) * active_highlight_roll * 10.0f);
+        }
+        if (rgb.z > knee) {
+            rgb.z = knee + (rgb.z - knee) / (1.0f + (rgb.z - knee) * active_highlight_roll * 10.0f);
+        }
+    }
+
+    // 4.8 HIGHLIGHT DESATURATION & LUMA-SAT COMPRESSION (Filmic Highlight Washout)
+    // Prevents "neon" oversaturated highlights by washing colors to white near clipping boundaries
+    if (active_hl_desat > 0.0f) {
+        float current_luma = 0.2627f * rgb.x + 0.6780f * rgb.y + 0.0593f * rgb.z;
+        if (current_luma > 0.45f) {
+            float sat_factor = 1.0f - (current_luma - 0.45f) * active_hl_desat * 2.0f;
+            sat_factor = (sat_factor < 0.0f) ? 0.0f : sat_factor;
+            rgb.x = current_luma + sat_factor * (rgb.x - current_luma);
+            rgb.y = current_luma + sat_factor * (rgb.y - current_luma);
+            rgb.z = current_luma + sat_factor * (rgb.z - current_luma);
+        }
+    }
+
+    // 4.9 DYNAMIC SILVER DENSITY FLICKER & ORGANIC EXPOSURE BREATHING
+    // Synthesizes dynamic density fluctuations based on pixel coordinate hash
+    if (active_silver_flicker > 0.0f) {
+        // Generate a high-frequency spatial seed reacting to the current pixel values
+        float spatial_hash = hash3d(p_X, p_Y, 77) - 0.5f;
+        
+        // Subtle micro-breathing scale (+/- 0.03 stops of exposure)
+        float flicker_mod = 1.0f + spatial_hash * active_silver_flicker * 0.03f;
+        
+        rgb.x *= flicker_mod;
+        rgb.y *= flicker_mod;
+        rgb.z *= flicker_mod;
+    }
+
+    // 5. SCENE-REAKTIVER FILM GRAIN (Livegrain-inspired Multi-layer system)
+    // Applied in DWG/Intermediate log-space to ensure smooth highlight/shadow roll-off.
+    if (active_grain_amount > 0.0f) {
+        // A. Calculate the pixel's current luminance using Rec.2020 weights specified in spec
+        float final_luma = 0.2627f * rgb.x + 0.6780f * rgb.y + 0.0593f * rgb.z;
+        
+        // Clamp luma safely to [0.0, 1.0] using pure conditionals to prevent math intrinsic errors
+        float clamped_luma = (final_luma < 0.0f) ? 0.0f : ((final_luma > 1.0f) ? 1.0f : final_luma);
+        
+        // B. Generate exposure-reactive grain luma mask (Power-skew model)
+        // Continuous skew: grain_bias < 0 shifts peak to shadows, grain_bias > 0 shifts to highlights.
+        float skew_power = 1.0f + active_grain_bias * 1.0f; // Range: [0.0f, 2.0f]
+        skew_power = (skew_power < 0.1f) ? 0.1f : skew_power; // Avoid negative powers or zero-division
+        
+        // Protect against NaN inside _powf if base is exactly 0.0f (deep shadows)
+        float skewed_luma = (clamped_luma > 0.0f) ? _powf(clamped_luma, skew_power) : 0.0f;
+        
+        // Parabolic mask peaks precisely at skewed_luma = 0.5 and drops to zero at highlights/shadows
+        float grain_mask = 4.0f * skewed_luma * (1.0f - skewed_luma);
+        
+        // C. Calculate temporal z_seed and safe grain size coordinates
+        int z_seed = (int)(active_grain_seed * 1000.0f) + TIMELINE_FRAME_INDEX;
+        float safe_size = (active_grain_size > 0.01f) ? active_grain_size : 1.0f;
+        float gx = (float)p_X / safe_size;
+        float gy = (float)p_Y / safe_size;
+        
+        float gx_floor = (float)((int)gx);
+        float gy_floor = (float)((int)gy);
+        
+        int ix = (int)gx_floor;
+        int iy = (int)gy_floor;
+        
+        float fx = gx - gx_floor;
+        float fy = gy - gy_floor;
+        
+        // D. Bilinear Interpolation for Red channel (z_seed + 1)
+        float r_noise_00 = hash3d(ix,     iy,     z_seed + 1);
+        float r_noise_10 = hash3d(ix + 1, iy,     z_seed + 1);
+        float r_noise_01 = hash3d(ix,     iy + 1, z_seed + 1);
+        float r_noise_11 = hash3d(ix + 1, iy + 1, z_seed + 1);
+        float r_noise_top = r_noise_00 * (1.0f - fx) + r_noise_10 * fx;
+        float r_noise_bot = r_noise_01 * (1.0f - fx) + r_noise_11 * fx;
+        float r_noise = (r_noise_top * (1.0f - fy) + r_noise_bot * fy) - 0.5f;
+        
+        // E. Bilinear Interpolation for Green channel (z_seed + 2)
+        float g_noise_00 = hash3d(ix,     iy,     z_seed + 2);
+        float g_noise_10 = hash3d(ix + 1, iy,     z_seed + 2);
+        float g_noise_01 = hash3d(ix,     iy + 1, z_seed + 2);
+        float g_noise_11 = hash3d(ix + 1, iy + 1, z_seed + 2);
+        float g_noise_top = g_noise_00 * (1.0f - fx) + g_noise_10 * fx;
+        float g_noise_bot = g_noise_01 * (1.0f - fx) + g_noise_11 * fx;
+        float g_noise = (g_noise_top * (1.0f - fy) + g_noise_bot * fy) - 0.5f;
+        
+        // F. Bilinear Interpolation for Blue channel (z_seed + 3)
+        float b_noise_00 = hash3d(ix,     iy,     z_seed + 3);
+        float b_noise_10 = hash3d(ix + 1, iy,     z_seed + 3);
+        float b_noise_01 = hash3d(ix,     iy + 1, z_seed + 3);
+        float b_noise_11 = hash3d(ix + 1, iy + 1, z_seed + 3);
+        float b_noise_top = b_noise_00 * (1.0f - fx) + b_noise_10 * fx;
+        float b_noise_bot = b_noise_01 * (1.0f - fx) + b_noise_11 * fx;
+        float b_noise = (b_noise_top * (1.0f - fy) + b_noise_bot * fy) - 0.5f;
+        
+        // G. Blend monochromatic and color-split grain (Grain Saturation)
+        float mono_noise = 0.2627f * r_noise + 0.6780f * g_noise + 0.0593f * b_noise;
+        r_noise = mono_noise + active_grain_sat * (r_noise - mono_noise);
+        g_noise = mono_noise + active_grain_sat * (g_noise - mono_noise);
+        b_noise = mono_noise + active_grain_sat * (b_noise - mono_noise);
+        
+        // F. Apply noise ADDITIVELY in Log-space (Standard Halide respond model)
+        // Highly organic, prevents pixel crushing and exposure clipping during display conversions
+        rgb.x = rgb.x + r_noise * active_grain_amount * grain_mask * 0.15f;
+        rgb.y = rgb.y + g_noise * active_grain_amount * grain_mask * 0.15f;
+        rgb.z = rgb.z + b_noise * active_grain_amount * grain_mask * 0.15f;
+    }
+
+    // 5.5 MECHANICAL MICRO GATE WEAVE EMULATION
+    // Emulates subtle camera-gate motion and lens vignetting/shading shifts
+    if (active_gate_weave > 0.0f) {
+        float dist_x = (float)p_X / (float)p_Width - 0.5f;
+        float dist_y = (float)p_Y / (float)p_Height - 0.5f;
+        float rad = dist_x * dist_x + dist_y * dist_y;
+        float weave_mod = _sinf(77.0f * rad + 12.0f) * 0.004f * active_gate_weave;
+        rgb.x *= 1.0f - weave_mod * 1.5f;
+        rgb.y *= 1.0f - weave_mod * 1.0f;
+        rgb.z *= 1.0f - weave_mod * 0.5f;
+    }
+
+    // ----------------------------------------------------------------
+    // OUTPUT COLOR SPACE CONVERSION (Auto-Encoding to Display)
+    // ----------------------------------------------------------------
+    if (output_space != BYPASS_OUT) {
+        // Decode DWG Intermediate log curve back to scene-linear
+        float r_lin = di_to_linear(rgb.x);
+        float g_lin = di_to_linear(rgb.y);
+        float b_lin = di_to_linear(rgb.z);
+        
+        if (output_space == REC709_OUT) {
+            // DWG to Rec.709 Primaries Mapping
+            float r_out = 1.89831313f * r_lin - 0.79205028f * g_lin - 0.10642184f * b_lin;
+            float g_out = -0.16895292f * r_lin + 1.48901017f * g_lin - 0.32003433f * b_lin;
+            float b_out = -0.12156832f * r_lin - 0.31575157f * g_lin + 1.43755990f * b_lin;
+            
+            rgb.x = linear_to_gamma24(r_out);
+            rgb.y = linear_to_gamma24(g_out);
+            rgb.z = linear_to_gamma24(b_out);
+        } else if (output_space == REC2020_OUT) {
+            // DWG to Rec.2020 Primaries Mapping
+            float r_out = 1.13030218f * r_lin - 0.02039300f * g_lin - 0.10990924f * b_lin;
+            float g_out = -0.02554667f * r_lin + 1.31084962f * g_lin - 0.28530290f * b_lin;
+            float b_out = -0.09259861f * r_lin - 0.16465342f * g_lin + 1.25725180f * b_lin;
+            
+            rgb.x = linear_to_gamma24(r_out);
+            rgb.y = linear_to_gamma24(g_out);
+            rgb.z = linear_to_gamma24(b_out);
+        } else if (output_space == DCIP3_OUT) {
+            // DWG to DCI-P3 (D65) Primaries Mapping
+            float r_out = 1.53154395f * r_lin - 0.38718504f * g_lin - 0.14435886f * b_lin;
+            float g_out = -0.10031783f * r_lin + 1.41325484f * g_lin - 0.31293703f * b_lin;
+            float b_out = -0.09046194f * r_lin - 0.19316362f * g_lin + 1.28362561f * b_lin;
+            
+            rgb.x = linear_to_gamma26(r_out);
+            rgb.y = linear_to_gamma26(g_out);
+            rgb.z = linear_to_gamma26(b_out);
+        }
+    }
+
+    // Schutz vor illegalen Werten (Clipping-Guard & Signal Integrity)
+    rgb.x = _fmaxf(0.0f, rgb.x);
+    rgb.y = _fmaxf(0.0f, rgb.y);
+    rgb.z = _fmaxf(0.0f, rgb.z);
+
+    return rgb;
+}

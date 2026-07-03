@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+PLUGIN="/Library/OFX/Plugins/BuckswoodAIPhotorealizer.ofx.bundle"
+
+# Do not re-sign here: the payload is already Developer ID signed and
+# notarized, and an ad-hoc codesign would replace that signature.
+if [ -d "$PLUGIN" ]; then
+    /usr/bin/xattr -dr com.apple.quarantine "$PLUGIN" >/dev/null 2>&1 || true
+fi
+
+CONSOLE_USER="$(/usr/bin/stat -f %Su /dev/console 2>/dev/null || true)"
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+    /bin/rm -rf "/Users/$CONSOLE_USER/Library/OFX/Plugins/BuckswoodAIPhotorealizer.ofx.bundle"
+fi
+
+# Clear Resolve's OFX plugin cache with a direct glob. Never scan /Users
+# recursively here: installer scripts are killed after 600s and a full
+# home-directory walk exceeds that on large disks (install error 112).
+for CACHE in \
+    /Users/*/Library/"Application Support"/"Blackmagic Design"/"DaVinci Resolve"/OFXPluginCache*.xml \
+    /var/root/Library/"Application Support"/"Blackmagic Design"/"DaVinci Resolve"/OFXPluginCache*.xml; do
+    /bin/rm -f "$CACHE" >/dev/null 2>&1 || true
+done
+
+exit 0

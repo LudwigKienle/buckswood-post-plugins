@@ -1,0 +1,131 @@
+// ====================================================================
+// Buckswood AI Photorealizer v01
+// De-plastic / photoreal pass for AI, CGI, phone, and over-smoothed footage.
+// Safe DCTL fallback: per-pixel only, no texture sampling, no arrays.
+// ====================================================================
+
+DEFINE_UI_PARAMS(plastic_reduction, "Plastic Reduction", DCTLUI_SLIDER_FLOAT, 0.65, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(skin_realism, "Skin Realism", DCTLUI_SLIDER_FLOAT, 0.55, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(highlight_realism, "Highlight Realism", DCTLUI_SLIDER_FLOAT, 0.70, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(color_naturalize, "Color Naturalize", DCTLUI_SLIDER_FLOAT, 0.55, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(texture_amount, "Sensor Texture", DCTLUI_SLIDER_FLOAT, 0.30, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(micro_contrast, "Micro Contrast", DCTLUI_SLIDER_FLOAT, 0.35, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(gamut_guard, "Gamut Guard", DCTLUI_SLIDER_FLOAT, 0.75, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(shadow_depth, "Shadow Depth", DCTLUI_SLIDER_FLOAT, 0.35, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(smoothness_breakup, "Smoothness Breakup", DCTLUI_SLIDER_FLOAT, 0.45, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(output_mix, "Output Mix", DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(seed, "Texture Seed", DCTLUI_SLIDER_FLOAT, 1.0, 1.0, 1000.0, 1.0)
+
+__DEVICE__ float bw_clamp01(float v)
+{
+    return _fminf(1.0f, _fmaxf(0.0f, v));
+}
+
+__DEVICE__ float bw_luma(float3 p)
+{
+    return 0.2627f * p.x + 0.6780f * p.y + 0.0593f * p.z;
+}
+
+__DEVICE__ float bw_hash01(int x, int y, int z)
+{
+    unsigned int h = (unsigned int)x * 73856093u ^ (unsigned int)y * 19349663u ^ (unsigned int)z * 83492791u;
+    h ^= h >> 16;
+    h *= 0x85ebca6bu;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35u;
+    h ^= h >> 16;
+    return (float)(h & 0x00ffffffu) / 16777216.0f;
+}
+
+__DEVICE__ float bw_soft_clip(float value, float knee, float amount)
+{
+    if (value <= knee) {
+        return value;
+    }
+    float over = value - knee;
+    return knee + over / (1.0f + over * amount * 8.0f);
+}
+
+__DEVICE__ float bw_skin_weight(float3 p)
+{
+    if (!(p.x > p.y && p.y > p.z)) {
+        return 0.0f;
+    }
+    float rg = p.x - p.y;
+    float gb = p.y - p.z;
+    float warm = (rg * gb) / (p.x * p.x + 0.001f);
+    float lum = bw_luma(p);
+    float exposure = bw_clamp01(1.0f - _fabs(lum - 0.52f) / 0.42f);
+    return bw_clamp01(warm * 3.0f) * exposure;
+}
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B)
+{
+    float3 dry = make_float3(p_R, p_G, p_B);
+    float3 rgb = dry;
+
+    float lum0 = bw_luma(rgb);
+    float skin = bw_clamp01(bw_skin_weight(rgb) * skin_realism);
+
+    float chroma_r = rgb.x - lum0;
+    float chroma_g = rgb.y - lum0;
+    float chroma_b = rgb.z - lum0;
+    float chroma = _fabs(chroma_r) + _fabs(chroma_g) + _fabs(chroma_b);
+
+    float neon = bw_clamp01((chroma - 0.22f) / 0.42f);
+    float highlight = bw_clamp01((lum0 - 0.62f) / 0.28f);
+    float gamut_compress = neon * gamut_guard;
+
+    rgb.x = lum0 + chroma_r * (1.0f - 0.38f * gamut_compress);
+    rgb.y = lum0 + chroma_g * (1.0f - 0.30f * gamut_compress);
+    rgb.z = lum0 + chroma_b * (1.0f - 0.34f * gamut_compress);
+
+    rgb.x += 0.018f * skin;
+    rgb.y += 0.007f * skin;
+    rgb.z -= 0.020f * skin;
+
+    float lum1 = bw_luma(rgb);
+    float pivot = 0.42f;
+    float contrast = 1.0f + micro_contrast * 0.18f;
+    float shaped_lum = pivot + (lum1 - pivot) * contrast;
+    rgb.x += shaped_lum - lum1;
+    rgb.y += shaped_lum - lum1;
+    rgb.z += shaped_lum - lum1;
+
+    float roll = highlight_realism * (0.45f + 0.55f * highlight);
+    rgb.x = bw_soft_clip(rgb.x, 0.74f, roll);
+    rgb.y = bw_soft_clip(rgb.y, 0.74f, roll);
+    rgb.z = bw_soft_clip(rgb.z, 0.74f, roll);
+
+    float lum2 = bw_luma(rgb);
+    float shadow_mask = bw_clamp01((0.42f - lum2) / 0.42f);
+    rgb.x *= 1.0f - shadow_mask * shadow_depth * 0.07f;
+    rgb.y *= 1.0f - shadow_mask * shadow_depth * 0.06f;
+    rgb.z *= 1.0f - shadow_mask * shadow_depth * 0.04f;
+
+    int z = (int)(seed * 997.0f);
+    float n1 = bw_hash01(p_X, p_Y, z) - 0.5f;
+    float n2 = bw_hash01(p_X + 19, p_Y - 7, z + 113) - 0.5f;
+    float n3 = bw_hash01(p_X - 5, p_Y + 23, z + 271) - 0.5f;
+    float texture_mask = bw_clamp01(0.20f + plastic_reduction * 0.65f + smoothness_breakup * 0.35f);
+    float texture = texture_amount * texture_mask * 0.018f;
+    rgb.x += n1 * texture;
+    rgb.y += n2 * texture;
+    rgb.z += n3 * texture;
+
+    float lum3 = bw_luma(rgb);
+    float natural_sat = 1.0f - color_naturalize * (0.08f + neon * 0.22f + highlight * 0.12f);
+    rgb.x = lum3 + (rgb.x - lum3) * natural_sat;
+    rgb.y = lum3 + (rgb.y - lum3) * natural_sat;
+    rgb.z = lum3 + (rgb.z - lum3) * natural_sat;
+
+    rgb.x = bw_clamp01(rgb.x);
+    rgb.y = bw_clamp01(rgb.y);
+    rgb.z = bw_clamp01(rgb.z);
+
+    rgb.x = dry.x + (rgb.x - dry.x) * output_mix;
+    rgb.y = dry.y + (rgb.y - dry.y) * output_mix;
+    rgb.z = dry.z + (rgb.z - dry.z) * output_mix;
+
+    return rgb;
+}

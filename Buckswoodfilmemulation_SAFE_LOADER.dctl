@@ -1,0 +1,76 @@
+// ====================================================================
+// Buckswood Film Emulation - Safe Loader Version
+// --------------------------------------------------------------------
+// Crash-safe fallback for DaVinci Resolve.
+// No UI parameters, no preset arrays, no texture sampling, no frame macros.
+// This is intentionally small so Resolve can load it as either a DCTL or LUT.
+// ====================================================================
+
+__DEVICE__ float bw_saturate(float v)
+{
+    return _fminf(1.0f, _fmaxf(0.0f, v));
+}
+
+__DEVICE__ float bw_soft_clip(float v)
+{
+    float knee = 0.78f;
+    if (v > knee) {
+        float over = v - knee;
+        v = knee + over / (1.0f + over * 3.0f);
+    }
+    return v;
+}
+
+__DEVICE__ float3 transform(
+    int p_Width,
+    int p_Height,
+    int p_X,
+    int p_Y,
+    float p_R,
+    float p_G,
+    float p_B)
+{
+    float3 rgb = make_float3(p_R, p_G, p_B);
+
+    const float contrast = 1.06f;
+    const float saturation = 0.96f;
+    const float dye_density = 0.18f;
+    const float warm_print = 0.018f;
+
+    float luma = 0.2627f * rgb.x + 0.6780f * rgb.y + 0.0593f * rgb.z;
+
+    float max_diff = _fmaxf(
+        _fabs(rgb.x - luma),
+        _fmaxf(_fabs(rgb.y - luma), _fabs(rgb.z - luma)));
+    float density_factor = 1.0f - max_diff * dye_density;
+    density_factor = _fmaxf(0.72f, density_factor);
+
+    rgb.x *= density_factor;
+    rgb.y *= density_factor;
+    rgb.z *= density_factor;
+
+    luma = 0.2627f * rgb.x + 0.6780f * rgb.y + 0.0593f * rgb.z;
+
+    rgb.x = luma + (rgb.x - luma) * saturation;
+    rgb.y = luma + (rgb.y - luma) * saturation;
+    rgb.z = luma + (rgb.z - luma) * saturation;
+
+    float pivot = 0.336f;
+    rgb.x = pivot + (rgb.x - pivot) * contrast;
+    rgb.y = pivot + (rgb.y - pivot) * contrast;
+    rgb.z = pivot + (rgb.z - pivot) * contrast;
+
+    rgb.x += warm_print;
+    rgb.y += warm_print * 0.45f;
+    rgb.z -= warm_print * 0.35f;
+
+    rgb.x = bw_soft_clip(rgb.x);
+    rgb.y = bw_soft_clip(rgb.y);
+    rgb.z = bw_soft_clip(rgb.z);
+
+    rgb.x = bw_saturate(rgb.x);
+    rgb.y = bw_saturate(rgb.y);
+    rgb.z = bw_saturate(rgb.z);
+
+    return rgb;
+}

@@ -1,0 +1,30 @@
+{
+  "scores": {
+    "plastic_look": 0.6,
+    "skin_waxy": 0.4,
+    "too_saturated": 0.5,
+    "neon_color": 0.35,
+    "flat_contrast": 0.2,
+    "crushed_shadows": 0.1,
+    "clipped_highlights": 0.25,
+    "underexposed": 0.0,
+    "overexposed": 0.1,
+    "green_cast": 0.1,
+    "magenta_cast": 0.0,
+    "too_warm": 0.0,
+    "too_cool": 0.15,
+    "good_as_is": 0.2
+  },
+  "intent": "natural",
+  "notes": [
+    "Synthetic highlights feel a little hard.",
+    "Color should be naturalized rather than made more saturated."
+  ],
+  "recommended_limits": {
+    "max_saturation_boost": 0.08,
+    "max_contrast_boost": 0.12,
+    "preserve_skin": true,
+    "protect_highlights": true
+  }
+}
+

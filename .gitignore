@@ -1,0 +1,77 @@
+# macOS / editor noise
+.DS_Store
+._*
+__MACOSX/
+.idea/
+.vscode/
+.claude/
+.codex/
+*.swp
+
+# Local secrets and signing material
+.env
+.env.*
+*.p12
+*.pfx
+*.cer
+*.key
+*.mobileprovision
+notarytool-profile.json
+
+# Build outputs
+build/
+dist/
+release/
+public_release/
+nuke_release/
+packaging/pkgroot/
+packaging/dmg_stage/
+*/packaging/pkgroot/
+*/packaging/dmg_stage/
+*.dmg
+*.pkg
+*.zip
+*.exe
+*.ofx
+*.ofx.bundle/
+*.prm
+*.dSYM/
+
+# Generated installer payloads
+windows_release/build/
+windows_release/public/
+windows_release/Buckswood_Resolve_Plugins_Windows/
+windows_release/installer/payload_data.h
+premiere_port/windows_installer/payload_data.h
+premiere_port/dist/
+premiere_port/release/
+premiere_port/windows_dist/
+premiere_port/sdk_sample_build/
+premiere_port/sdk_synth_build/
+
+# Large local toolchains and caches
+third_party/toolchains/
+third_party/openfx/Documentation/
+third_party/openfx/Examples/
+third_party/openfx/HostSupport/
+third_party/openfx/Support/
+third_party/openfx/cmake/
+third_party/openfx/scripts/
+third_party/openfx/test_package/
+_feedback_video_frames/
+disabled_resolve_buckswood_backups/
+github_export/
+
+# Private or third-party reference assets that should not be published blindly
+Referent Viewing LUT - CKC/
+Backup/
+MOU_AI_Film_Pipeline_*.docx
+gemini-code-*.md
+
+# Generated media
+Buckswood_YouTube_Giveaway_HeyGen/
+premiere_port/release/*.mp4
+
+# Vendored source repos (derived files are committed separately)
+Buckswood_Lens_Physics/assets/lensfun_repo/
+third_party/openfx/.git/
