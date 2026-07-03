@@ -71,7 +71,3 @@ gemini-code-*.md
 # Generated media
 Buckswood_YouTube_Giveaway_HeyGen/
 premiere_port/release/*.mp4
-
-# Vendored source repos (derived files are committed separately)
-Buckswood_Lens_Physics/assets/lensfun_repo/
-third_party/openfx/.git/

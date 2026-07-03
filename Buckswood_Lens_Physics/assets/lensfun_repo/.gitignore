@@ -1,0 +1,10 @@
+build/
+include/config.h
+include/lensfun/lensfun.h
+tools/vagrant/.vagrant
+docs/website/_site
+*.pyc
+TAGS
+tools/calibration_statistics/distortion.dat
+test_db.xml
+tools/calibration_statistics/plot.gp
