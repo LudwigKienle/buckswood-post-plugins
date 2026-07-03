@@ -55,7 +55,7 @@ Buckswood OFX for Nuke v2
 Included OFX plug-ins:
 
 - Buckswood Fake Diagnostic v2.1
-- Buckswood Lens Physics v0.3 Anti-Ghosting
+- Buckswood Lens Physics v0.4 Overdrive Edge Guard
 - Buckswood AI Photorealizer v0.2
 
 Nuke can load OpenFX plug-ins directly. This package is experimental because

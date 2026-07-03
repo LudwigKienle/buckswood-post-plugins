@@ -5,9 +5,9 @@ export COPYFILE_DISABLE=1
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APP_NAME="Buckswood Lens Physics v0.3"
+APP_NAME="Buckswood Lens Physics v0.4"
 IDENTIFIER="com.buckswood.lensphysics"
-VERSION="0.3.0"
+VERSION="0.4.0"
 PLUGIN_BUNDLE="BuckswoodLensPhysics.ofx.bundle"
 PKGROOT="$ROOT_DIR/packaging/pkgroot"
 PKG_SCRIPTS="$ROOT_DIR/packaging/scripts"

@@ -19,7 +19,7 @@ detect_identity() {
         /usr/bin/awk -F '"' -v pattern="$pattern" '$2 ~ pattern { print $2; exit }'
 }
 
-DEVELOPER_ID_APPLICATION="${DEVELOPER_ID_APPLICATION:-$(detect_identity "Developer ID Application: Ludwig Kienle")}"
+DEVELOPER_ID_APPLICATION="${DEVELOPER_ID_APPLICATION:-$(detect_identity "Developer ID Application:")}"
 
 can_notarize() {
     [[ -n "$NOTARY_PROFILE" ]] && xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1
@@ -28,10 +28,75 @@ can_notarize() {
 declare -a SRC_PKGS=(
     "Buckswood_Fake_Diagnostic/release/Buckswood_Fake_Diagnostic_Installer.pkg|Buckswood_Fake_Diagnostic_v2.1_Installer.pkg"
     "Buckswood_AI_Photorealizer/release/Buckswood_AI_Photorealizer_Installer.pkg|Buckswood_AI_Photorealizer_v0.2_Installer.pkg"
-    "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer.pkg|Buckswood_Lens_Physics_v0.3_AntiGhosting_Installer.pkg"
+    "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer.pkg|Buckswood_Lens_Physics_v0.4_Overdrive_Edge_Guard_Installer.pkg"
 )
 
-mkdir -p "$V2_DIR/Installers" "$V2_DIR/Checksums"
+rm -rf "$V2_DIR"
+mkdir -p "$V2_DIR/Installers" "$V2_DIR/Checksums" "$V2_DIR/Windows"
+
+cat > "$V2_DIR/README.md" <<'MD'
+# Buckswood Resolve Plugins v2
+
+Release for DaVinci Resolve / OpenFX on macOS and Windows.
+
+## Included macOS Installers
+
+- `Buckswood_Fake_Diagnostic_v2.1_Installer.pkg`
+  - temporal diagnostics
+  - Adjustment Layer Guard
+  - safer default temporal behavior
+
+- `Buckswood_AI_Photorealizer_v0.2_Installer.pkg`
+  - photoreal AI assist
+  - Adjustment Layer Guard
+  - universal macOS binary
+
+- `Buckswood_Lens_Physics_v0.4_Overdrive_Edge_Guard_Installer.pkg`
+  - Overdrive Edge Guard for high-contrast silhouettes
+  - reduced artificial CA/fringing outlines on hard edges
+  - preserves lens character in texture, glow, and highlights
+
+## Included Windows Files
+
+- `Windows/Buckswood_Resolve_Plugins_v2_Windows_Setup.exe`
+  - installs all three OFX plugins to `C:\Program Files\Common Files\OFX\Plugins`
+  - installs the Lens Physics and AI Photorealizer DCTL fallbacks
+
+- `Windows/Buckswood_Resolve_Plugins_v2_Windows_Manual.zip`
+  - manual-copy version for users who do not want to run the setup app
+
+## Install on macOS
+
+1. Quit DaVinci Resolve completely.
+2. Run all three `.pkg` installers in the `Installers` folder.
+3. Restart DaVinci Resolve.
+4. In Resolve, open `Color Page > OpenFX > Buckswood`.
+
+## Install on Windows
+
+1. Quit DaVinci Resolve completely.
+2. Right-click `Windows/Buckswood_Resolve_Plugins_v2_Windows_Setup.exe`.
+3. Choose `Run as administrator`.
+4. Restart DaVinci Resolve.
+5. In Resolve, open `Color Page > OpenFX > Buckswood`.
+
+## Important
+
+If older Buckswood plugins were installed system-wide, these installers replace them in:
+
+```text
+/Library/OFX/Plugins
+C:\Program Files\Common Files\OFX\Plugins
+```
+
+The installers also clear Resolve's OpenFX plugin cache so Resolve rescans the new builds on restart.
+
+## Verification
+
+The macOS installers are signed and notarized with Apple Developer ID.
+The Windows installer is not Authenticode-signed yet, so Windows SmartScreen may warn on first launch.
+Use `SHA256SUMS.txt` and `Windows/SHA256SUMS_WINDOWS.txt` to verify package integrity.
+MD
 
 for entry in "${SRC_PKGS[@]}"; do
     src="$ROOT_DIR/${entry%%|*}"
@@ -47,6 +112,19 @@ for f in \
     "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer_SHA256SUMS.txt"; do
     [[ -f "$ROOT_DIR/$f" ]] && cp "$ROOT_DIR/$f" "$V2_DIR/Checksums/"
 done
+
+if [[ -f "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Setup.exe" &&
+      -f "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Windows.zip" ]]; then
+    cp "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Setup.exe" "$V2_DIR/Windows/Buckswood_Resolve_Plugins_v2_Windows_Setup.exe"
+    cp "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Windows.zip" "$V2_DIR/Windows/Buckswood_Resolve_Plugins_v2_Windows_Manual.zip"
+    cp "$ROOT_DIR/windows_release/public/README_WINDOWS.txt" "$V2_DIR/Windows/README_WINDOWS.txt"
+    (
+        cd "$V2_DIR/Windows"
+        shasum -a 256 Buckswood_Resolve_Plugins_v2_Windows_Setup.exe Buckswood_Resolve_Plugins_v2_Windows_Manual.zip README_WINDOWS.txt > SHA256SUMS_WINDOWS.txt
+    )
+    cp "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Setup.exe" "$RELEASE_DIR/Buckswood_Resolve_Plugins_v2_Windows_Setup.exe"
+    cp "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Windows.zip" "$RELEASE_DIR/Buckswood_Resolve_Plugins_v2_Windows.zip"
+fi
 
 (
     cd "$V2_DIR"

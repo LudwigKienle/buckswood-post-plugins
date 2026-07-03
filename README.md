@@ -5,7 +5,7 @@ Free cinematic post-production tools for DaVinci Resolve, with experimental Prem
 This repository contains the source for three main Buckswood Resolve tools:
 
 - **Buckswood Fake Diagnostic v2.1** - a supervisor-style diagnostic overlay for AI, CG, and compositing shots that feel fake.
-- **Buckswood Lens Physics v0.3** - lens-character simulation with anti-ghosting, chromatic aberration, bloom, coma, vignette, and IMAX/Dune-inspired presets.
+- **Buckswood Lens Physics v0.4** - lens-character simulation with overdrive edge protection, chromatic aberration, bloom, coma, vignette, and IMAX/Dune-inspired presets.
 - **Buckswood AI Photorealizer v0.2** - a conservative de-plastic and photoreal assist pass for AI/CG/phone footage.
 
 The primary release target is DaVinci Resolve/OpenFX. Premiere Pro and Nuke builds are packaged as separate host downloads.

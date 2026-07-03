@@ -2,7 +2,9 @@
 #include <cstring>
 #include <exception>
 #include <new>
+#include <thread>
 #include <type_traits>
+#include <vector>
 
 #include "PhotorealizerCore.h"
 
@@ -218,6 +220,36 @@ bool sourceLooksLikeBlankAdjustmentByDepth(const ImageInfo& srcInfo)
     return false;
 }
 
+// Runs rowFn over contiguous bands of rows, one band per thread; every
+// thread writes disjoint rows, so the output is identical to a serial loop.
+template <typename RowRangeFn>
+void parallelRows(const OfxRectI& renderWindow, const RowRangeFn& rowFn)
+{
+    const int rowCount = renderWindow.y2 - renderWindow.y1;
+    const unsigned threadCount = std::min<unsigned>(
+        std::max(1u, std::thread::hardware_concurrency()),
+        static_cast<unsigned>(std::max(1, rowCount)));
+    if (threadCount <= 1) {
+        rowFn(renderWindow.y1, renderWindow.y2);
+        return;
+    }
+
+    const int rowsPerBand = (rowCount + static_cast<int>(threadCount) - 1) / static_cast<int>(threadCount);
+    std::vector<std::thread> workers;
+    workers.reserve(threadCount);
+    for (unsigned t = 0; t < threadCount; ++t) {
+        const int yBegin = renderWindow.y1 + static_cast<int>(t) * rowsPerBand;
+        const int yEnd = std::min(renderWindow.y2, yBegin + rowsPerBand);
+        if (yBegin >= yEnd) {
+            break;
+        }
+        workers.emplace_back(rowFn, yBegin, yEnd);
+    }
+    for (auto& worker : workers) {
+        worker.join();
+    }
+}
+
 OfxStatus renderFloat(
     OfxImageEffectHandle instance,
     const OfxRectI& renderWindow,
@@ -229,29 +261,31 @@ OfxStatus renderFloat(
     auto* src = reinterpret_cast<OfxRGBAColourF*>(srcInfo.data);
     auto* dst = reinterpret_cast<OfxRGBAColourF*>(dstInfo.data);
 
-    for (int y = renderWindow.y1; y < renderWindow.y2; ++y) {
-        if (gEffectHost->abort(instance)) {
-            break;
-        }
+    parallelRows(renderWindow, [&](int yBegin, int yEnd) {
+        for (int y = yBegin; y < yEnd; ++y) {
+            if (gEffectHost->abort(instance)) {
+                break;
+            }
 
-        auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
-        for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
-            auto* srcPix = pixelAddress(src, srcInfo.bounds, x, y, srcInfo.rowBytes);
-            if (srcPix && dstPix) {
-                buckswood::Pixel in{srcPix->r, srcPix->g, srcPix->b, srcPix->a};
-                buckswood::Pixel out = buckswood::PhotorealizerCore::processPixel(in, x, y, frame, controls);
-                dstPix->r = out.r;
-                dstPix->g = out.g;
-                dstPix->b = out.b;
-                dstPix->a = out.a;
-            } else if (dstPix) {
-                *dstPix = OfxRGBAColourF{0.0f, 0.0f, 0.0f, 0.0f};
-            }
-            if (dstPix) {
-                ++dstPix;
+            auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
+            for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
+                auto* srcPix = pixelAddress(src, srcInfo.bounds, x, y, srcInfo.rowBytes);
+                if (srcPix && dstPix) {
+                    buckswood::Pixel in{srcPix->r, srcPix->g, srcPix->b, srcPix->a};
+                    buckswood::Pixel out = buckswood::PhotorealizerCore::processPixel(in, x, y, frame, controls);
+                    dstPix->r = out.r;
+                    dstPix->g = out.g;
+                    dstPix->b = out.b;
+                    dstPix->a = out.a;
+                } else if (dstPix) {
+                    *dstPix = OfxRGBAColourF{0.0f, 0.0f, 0.0f, 0.0f};
+                }
+                if (dstPix) {
+                    ++dstPix;
+                }
             }
         }
-    }
+    });
     return kOfxStatOK;
 }
 

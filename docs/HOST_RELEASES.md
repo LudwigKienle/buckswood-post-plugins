@@ -14,7 +14,7 @@ Release assets:
 Included tools:
 
 - Buckswood Fake Diagnostic v2.1
-- Buckswood Lens Physics v0.3 Anti-Ghosting
+- Buckswood Lens Physics v0.4 Overdrive Edge Guard
 - Buckswood AI Photorealizer v0.2
 
 ## Nuke

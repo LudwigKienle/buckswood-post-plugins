@@ -5,10 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GH_BIN="${GH_BIN:-gh}"
 REPO_NAME="${REPO_NAME:-buckswood-post-plugins}"
 VISIBILITY="${VISIBILITY:-public}"
-TAG="${TAG:-v2.0.0}"
-TITLE="${TITLE:-Buckswood Post Plugins v2.0.0}"
+TAG="${TAG:-v2.0.1}"
+TITLE="${TITLE:-Buckswood Post Plugins v2.0.1}"
 RELEASE_DIR="${RELEASE_DIR:-}"
-NOTES_FILE="${NOTES_FILE:-$ROOT_DIR/docs/RELEASE_NOTES_v2.0.0.md}"
+NOTES_FILE="${NOTES_FILE:-$ROOT_DIR/docs/RELEASE_NOTES_v2.0.1.md}"
 
 if [[ -z "$RELEASE_DIR" ]]; then
     if [[ -d "$ROOT_DIR/release" ]]; then

@@ -78,6 +78,7 @@ inline buckswood_lens::Controls realisticLensDefaults()
         0.060f, // fStopSharpener
         0.85f,  // overdrive
         0.55f,  // outputMix
+        0.82f,  // edgeHaloGuard
     };
 }
 

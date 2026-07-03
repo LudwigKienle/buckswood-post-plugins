@@ -2,7 +2,9 @@
 #include <cstring>
 #include <exception>
 #include <new>
+#include <thread>
 #include <type_traits>
+#include <vector>
 
 #include "LensPhysicsCore.h"
 
@@ -29,7 +31,7 @@ OfxParameterSuiteV1* gParamHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.lens.physics";
 constexpr int kPluginMajorVersion = 0;
-constexpr int kPluginMinorVersion = 3;
+constexpr int kPluginMinorVersion = 4;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -222,6 +224,7 @@ buckswood_lens::Controls controlsAtTime(OfxImageEffectHandle instance, OfxTime t
     c.fStopSharpener = static_cast<float>(doubleParamAtTime(instance, "fStopSharpener", time, 0.060));
     c.overdrive = static_cast<float>(doubleParamAtTime(instance, "overdrive", time, 0.85));
     c.outputMix = static_cast<float>(doubleParamAtTime(instance, "outputMix", time, 0.55));
+    c.edgeHaloGuard = static_cast<float>(doubleParamAtTime(instance, "edgeHaloGuard", time, 0.82));
     return c;
 }
 
@@ -338,6 +341,15 @@ private:
     OfxRGBAColourB* base_;
 };
 
+// Number of worker threads for the render loop. Rows are split into
+// contiguous bands, one per thread; every thread writes disjoint rows, so the
+// output is identical to the single-threaded loop.
+unsigned renderThreadCount(int rowCount)
+{
+    const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
+    return std::min<unsigned>(hw, static_cast<unsigned>(std::max(1, rowCount)));
+}
+
 template <typename DstPixel, typename SamplerT>
 OfxStatus renderTyped(
     OfxImageEffectHandle instance,
@@ -347,37 +359,61 @@ OfxStatus renderTyped(
     const buckswood_lens::FrameInfo& frame,
     const buckswood_lens::Controls& controls)
 {
-    SamplerT sampler(srcInfo);
+    const SamplerT sampler(srcInfo);
     auto* dst = reinterpret_cast<DstPixel*>(dstInfo.data);
 
-    for (int y = renderWindow.y1; y < renderWindow.y2; ++y) {
-        if (gEffectHost->abort(instance)) {
-            break;
-        }
+    auto renderRows = [&](int yBegin, int yEnd) {
+        for (int y = yBegin; y < yEnd; ++y) {
+            if (gEffectHost->abort(instance)) {
+                break;
+            }
 
-        auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
-        for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
-            if (dstPix) {
-                buckswood_lens::Pixel out = buckswood_lens::LensPhysicsCore::processPixel(
-                    sampler,
-                    x,
-                    y,
-                    frame,
-                    controls);
-                if constexpr (std::is_same<DstPixel, OfxRGBAColourF>::value) {
-                    dstPix->r = out.r;
-                    dstPix->g = out.g;
-                    dstPix->b = out.b;
-                    dstPix->a = out.a;
-                } else {
-                    dstPix->r = toByte(out.r);
-                    dstPix->g = toByte(out.g);
-                    dstPix->b = toByte(out.b);
-                    dstPix->a = toByte(out.a);
+            auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
+            for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
+                if (dstPix) {
+                    buckswood_lens::Pixel out = buckswood_lens::LensPhysicsCore::processPixel(
+                        sampler,
+                        x,
+                        y,
+                        frame,
+                        controls);
+                    if constexpr (std::is_same<DstPixel, OfxRGBAColourF>::value) {
+                        dstPix->r = out.r;
+                        dstPix->g = out.g;
+                        dstPix->b = out.b;
+                        dstPix->a = out.a;
+                    } else {
+                        dstPix->r = toByte(out.r);
+                        dstPix->g = toByte(out.g);
+                        dstPix->b = toByte(out.b);
+                        dstPix->a = toByte(out.a);
+                    }
+                    ++dstPix;
                 }
-                ++dstPix;
             }
         }
+    };
+
+    const int rowCount = renderWindow.y2 - renderWindow.y1;
+    const unsigned threadCount = renderThreadCount(rowCount);
+    if (threadCount <= 1) {
+        renderRows(renderWindow.y1, renderWindow.y2);
+        return kOfxStatOK;
+    }
+
+    const int rowsPerBand = (rowCount + static_cast<int>(threadCount) - 1) / static_cast<int>(threadCount);
+    std::vector<std::thread> workers;
+    workers.reserve(threadCount);
+    for (unsigned t = 0; t < threadCount; ++t) {
+        const int yBegin = renderWindow.y1 + static_cast<int>(t) * rowsPerBand;
+        const int yEnd = std::min(renderWindow.y2, yBegin + rowsPerBand);
+        if (yBegin >= yEnd) {
+            break;
+        }
+        workers.emplace_back(renderRows, yBegin, yEnd);
+    }
+    for (auto& worker : workers) {
+        worker.join();
     }
     return kOfxStatOK;
 }
@@ -566,7 +602,8 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     defineDoubleParam(paramSet, "fStopSharpener", "F-Stop Sharpener", 0.060, -1.0, 1.0, 11, page);
     defineDoubleParam(paramSet, "overdrive", "Overdrive", 0.85, 0.0, 3.0, 12, page);
     defineDoubleParam(paramSet, "outputMix", "Output Mix", 0.55, 0.0, 1.0, 13, page);
-    defineBooleanParam(paramSet, "adjustmentLayerGuard", "Adjustment Layer Guard", 1, 14, page);
+    defineDoubleParam(paramSet, "edgeHaloGuard", "Overdrive Edge Guard", 0.82, 0.0, 1.0, 14, page);
+    defineBooleanParam(paramSet, "adjustmentLayerGuard", "Adjustment Layer Guard", 1, 15, page);
 
     return kOfxStatOK;
 }
@@ -578,7 +615,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(effectProps, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood Lens Physics v0.3");
+    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood Lens Physics v0.4");
     gPropHost->propSetString(effectProps, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
     return kOfxStatOK;

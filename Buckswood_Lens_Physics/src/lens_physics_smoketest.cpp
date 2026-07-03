@@ -1,5 +1,6 @@
 #include "LensPhysicsCore.h"
 
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 
@@ -20,6 +21,22 @@ public:
         };
     }
 };
+
+class HardEdgeSampler final : public buckswood_lens::Sampler {
+public:
+    buckswood_lens::Pixel sample(float x, float) const override
+    {
+        if (x < 1702.0f) {
+            return buckswood_lens::Pixel{0.055f, 0.060f, 0.070f, 1.0f};
+        }
+        return buckswood_lens::Pixel{0.82f, 0.78f, 0.68f, 1.0f};
+    }
+};
+
+float luma(const buckswood_lens::Pixel& pixel)
+{
+    return 0.2627f * pixel.r + 0.6780f * pixel.g + 0.0593f * pixel.b;
+}
 
 } // namespace
 
@@ -42,6 +59,7 @@ int main()
         0.10f,  // fStopSharpener
         1.0f,   // overdrive
         1.0f,   // outputMix
+        0.82f,  // edgeHaloGuard
     };
 
     const int points[][2] = {
@@ -65,6 +83,31 @@ int main()
                   << out.b << " "
                   << out.a << "\n";
     }
+
+    HardEdgeSampler edgeSampler;
+    controls.lensPreset = 18;
+    controls.chromaticAberration = 0.40f;
+    controls.fringing = 0.35f;
+    controls.coma = 0.40f;
+    controls.bloom = 0.35f;
+    controls.fStopSharpener = 0.18f;
+    controls.overdrive = 1.0f;
+    controls.outputMix = 1.0f;
+    controls.edgeHaloGuard = 0.82f;
+
+    const buckswood_lens::Pixel dryEdge = edgeSampler.sample(1701.0f, 540.0f);
+    const buckswood_lens::Pixel guardedEdge = buckswood_lens::LensPhysicsCore::processPixel(
+        edgeSampler,
+        1701,
+        540,
+        frame,
+        controls);
+    const float edgeLift = luma(guardedEdge) - luma(dryEdge);
+    std::cout << "edge_lift " << edgeLift << "\n";
+    if (edgeLift > 0.12f || !std::isfinite(edgeLift)) {
+        std::cerr << "Overdrive edge guard regression: edge lift " << edgeLift << "\n";
+        return 1;
+    }
+
     return 0;
 }
-

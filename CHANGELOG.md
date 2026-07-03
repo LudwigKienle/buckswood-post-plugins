@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.0.1 - 2026-07-03
+
+- Updated `Buckswood Lens Physics` to v0.4 with an overdrive-aware edge guard for high-contrast silhouettes.
+- Added `Overdrive Edge Guard`, which automatically reduces CA, fringing, bloom/coma spill, and sharpening on hard edges while preserving the stronger lens look in texture and highlights.
+- Added a regression smoketest for high-overdrive hard-edge halos.
+- Updated the shared Lens Physics core default used by the Premiere native port.
+
 ## v2 - 2026-07-03
 
 - Added `Buckswood Fake Diagnostic v2.1`.

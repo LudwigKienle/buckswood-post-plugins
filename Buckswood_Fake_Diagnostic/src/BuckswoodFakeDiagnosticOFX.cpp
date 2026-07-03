@@ -2,7 +2,9 @@
 #include <cstring>
 #include <exception>
 #include <new>
+#include <thread>
 #include <type_traits>
+#include <vector>
 
 #include "FakeDiagnosticCore.h"
 
@@ -301,10 +303,10 @@ OfxStatus renderTyped(
     const buckswood_fake::Controls& controls,
     int viewMode)
 {
-    SamplerT sampler(srcInfo);
-    SamplerT previousSampler(previousInfo ? *previousInfo : srcInfo);
-    SamplerT nextSampler(nextInfo ? *nextInfo : srcInfo);
-    const buckswood_fake::TemporalContext temporal{
+    const SamplerT sampler(srcInfo);
+    const SamplerT previousSampler(previousInfo ? *previousInfo : srcInfo);
+    const SamplerT nextSampler(nextInfo ? *nextInfo : srcInfo);
+    const buckswood_fake::TemporalContextT<SamplerT> temporal{
         previousInfo ? &previousSampler : nullptr,
         nextInfo ? &nextSampler : nullptr,
         previousInfo != nullptr,
@@ -312,36 +314,64 @@ OfxStatus renderTyped(
     };
     auto* dst = reinterpret_cast<DstPixel*>(dstInfo.data);
 
-    for (int y = renderWindow.y1; y < renderWindow.y2; ++y) {
-        if (gEffectHost->abort(instance)) {
-            break;
-        }
+    auto renderRows = [&](int yBegin, int yEnd) {
+        for (int y = yBegin; y < yEnd; ++y) {
+            if (gEffectHost->abort(instance)) {
+                break;
+            }
 
-        auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
-        for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
-            if (dstPix) {
-                const buckswood_fake::Pixel out = buckswood_fake::FakeDiagnosticCore::processPixel(
-                    sampler,
-                    x,
-                    y,
-                    frame,
-                    controls,
-                    viewMode,
-                    &temporal);
-                if constexpr (std::is_same<DstPixel, OfxRGBAColourF>::value) {
-                    dstPix->r = out.r;
-                    dstPix->g = out.g;
-                    dstPix->b = out.b;
-                    dstPix->a = out.a;
-                } else {
-                    dstPix->r = toByte(out.r);
-                    dstPix->g = toByte(out.g);
-                    dstPix->b = toByte(out.b);
-                    dstPix->a = toByte(out.a);
+            auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
+            for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
+                if (dstPix) {
+                    const buckswood_fake::Pixel out = buckswood_fake::FakeDiagnosticCore::processPixel(
+                        sampler,
+                        x,
+                        y,
+                        frame,
+                        controls,
+                        viewMode,
+                        &temporal);
+                    if constexpr (std::is_same<DstPixel, OfxRGBAColourF>::value) {
+                        dstPix->r = out.r;
+                        dstPix->g = out.g;
+                        dstPix->b = out.b;
+                        dstPix->a = out.a;
+                    } else {
+                        dstPix->r = toByte(out.r);
+                        dstPix->g = toByte(out.g);
+                        dstPix->b = toByte(out.b);
+                        dstPix->a = toByte(out.a);
+                    }
+                    ++dstPix;
                 }
-                ++dstPix;
             }
         }
+    };
+
+    // Rows are split into contiguous bands, one per thread; every thread
+    // writes disjoint rows, so the output is identical to a serial loop.
+    const int rowCount = renderWindow.y2 - renderWindow.y1;
+    const unsigned threadCount = std::min<unsigned>(
+        std::max(1u, std::thread::hardware_concurrency()),
+        static_cast<unsigned>(std::max(1, rowCount)));
+    if (threadCount <= 1) {
+        renderRows(renderWindow.y1, renderWindow.y2);
+        return kOfxStatOK;
+    }
+
+    const int rowsPerBand = (rowCount + static_cast<int>(threadCount) - 1) / static_cast<int>(threadCount);
+    std::vector<std::thread> workers;
+    workers.reserve(threadCount);
+    for (unsigned t = 0; t < threadCount; ++t) {
+        const int yBegin = renderWindow.y1 + static_cast<int>(t) * rowsPerBand;
+        const int yEnd = std::min(renderWindow.y2, yBegin + rowsPerBand);
+        if (yBegin >= yEnd) {
+            break;
+        }
+        workers.emplace_back(renderRows, yBegin, yEnd);
+    }
+    for (auto& worker : workers) {
+        worker.join();
     }
     return kOfxStatOK;
 }
