@@ -1,85 +1,55 @@
-# Buckswood Premiere Native Plugins
+# Buckswood Premiere Native Plugins for macOS
 
-This folder contains native Adobe Premiere Pro video-filter builds for:
+This package contains eight native Adobe Premiere Pro video filters:
 
-- Buckswood AI Photorealizer
+- Buckswood Fake Diagnostic
 - Buckswood Lens Physics
+- Buckswood AI Photorealizer
+- Buckswood Film Emulation
+- Buckswood Frame Director
+- Buckswood Radiance Recover
+- Buckswood Temporal Integrity
+- Buckswood Look DNA
 
-The plugins use Premiere's native C++ video-filter entry point (`xFilter`) and expose animatable Effect Controls through PiPL `ANIM_ParamAtom` resources.
-
-## Built Files
-
-- `dist/BuckswoodAIPhotorealizer.bundle`
-- `dist/BuckswoodLensPhysics.bundle`
-- `dist/BuckswoodAIPhotorealizer_Premiere_macOS.zip`
-- `dist/BuckswoodLensPhysics_Premiere_macOS.zip`
-- `release/Buckswood_Premiere_Native_macOS.zip`
+They use Premiere's native C++ `xFilter` entry point and expose animatable
+Effect Controls through PiPL resources. Every effect processes Premiere's
+32-bit floating-point BGRA frames on the CPU.
 
 ## Install
 
-Double-click:
+1. Close Premiere Pro.
+2. Double-click `native/scripts/install_premiere_plugins.command`.
+3. Enter the macOS administrator password when requested.
+4. Restart Premiere Pro and search for `Buckswood` in the Effects panel.
 
-```bash
-native/scripts/install_premiere_plugins.command
-```
-
-Or copy both `.bundle` folders manually to:
-
-```bash
-/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/
-```
-
-Restart Premiere Pro after installation. The effects should appear under:
+Manual install folder:
 
 ```text
-Effects > Buckswood
+/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/
 ```
 
 ## Build
 
 ```bash
-native/scripts/build_premiere_plugins.sh "/Users/ludwig.kienle/Downloads/Premiere Pro 26.0 C++ SDK 2"
+ARCHS="arm64 x86_64" native/scripts/build_premiere_plugins.sh "/path/to/Premiere Pro C++ SDK"
 ```
 
-The packaged release zip is built as a universal macOS binary (`arm64` + `x86_64`). By default, a fresh local build creates Apple Silicon (`arm64`) bundles. To build for multiple macOS architectures:
+The packaged release is `release/Buckswood_Premiere_Native_macOS.zip`.
+Individual bundles and ZIP files are written to `dist/`.
 
-```bash
-ARCHS="arm64 x86_64" native/scripts/build_premiere_plugins.sh "/Users/ludwig.kienle/Downloads/Premiere Pro 26.0 C++ SDK 2"
-```
+## Premiere-Specific Behavior
 
-## Parameters
+- Fake Diagnostic includes all spatial views and Reality Match Assist. Its
+  Resolve-only temporal views are omitted because this Premiere filter API
+  supplies the current frame only.
+- Film Emulation includes the negative/print pipeline, AI stocks, grain,
+  halation and bloom. Temporal reconstruction stays disabled in this host.
+- Frame Director performs current-frame saliency analysis, crop guidance,
+  subject lock and manual framing. Cut-aware temporal smoothing stays disabled.
+- Radiance Recover keeps floating-point headroom and all spatial recovery tools.
+- Temporal Integrity uses a clearly documented spatial stability fallback in
+  Premiere. It does not pretend to inspect adjacent frames.
+- Look DNA performs real profile-based look matching. External references use
+  three `.bwlook` slots because this PiPL filter API has no path picker.
 
-Buckswood AI Photorealizer:
-
-- Plastic Reduction
-- Skin Realism
-- Highlight Realism
-- Color Naturalize
-- Sensor Texture
-- Micro Contrast
-- Gamut Guard
-- Shadow Depth
-- Smoothness Breakup
-- Output Mix
-- Texture Seed
-
-Buckswood Lens Physics:
-
-- Lens Preset
-- Effect Strength
-- Distortion Trim
-- Chromatic Aberration
-- High Contrast Fringe
-- Edge Coma
-- Highlight Bloom
-- Bloom Threshold
-- Vignette
-- Corner Color Cast
-- Swirl
-- F-Stop Sharpener
-- Overdrive
-- Output Mix
-
-## Notes
-
-This build intentionally uses a CPU-only `BGRA_4444_32f` path for stability and quality. It now mirrors the DaVinci/OpenFX parameter surface much more closely while staying inside Premiere's native video-filter API.
+See `PREMIERE_EFFECT_GUIDE.md` for numeric mode maps and Look DNA profile setup.

@@ -11,12 +11,20 @@ add_library(buckswood_premiere_adapter STATIC
     src/BuckswoodPremiereAdapter.cpp
     "${ROOT_DIR}/Buckswood_AI_Photorealizer/src/PhotorealizerCore.cpp"
     "${ROOT_DIR}/Buckswood_Lens_Physics/src/LensPhysicsCore.cpp"
+    "${ROOT_DIR}/Buckswood_Fake_Diagnostic/src/FakeDiagnosticCore.cpp"
+    "${ROOT_DIR}/Buckswood_Film_Emulation/src/FilmEmulationCore.cpp"
+    "${ROOT_DIR}/Buckswood_Cinematic_Tools/src/CinematicToolsCore.cpp"
+    "${ROOT_DIR}/Buckswood_Look_DNA/src/LookDNACore.cpp"
 )
 
 target_include_directories(buckswood_premiere_adapter PUBLIC
     src
     "${ROOT_DIR}/Buckswood_AI_Photorealizer/include"
     "${ROOT_DIR}/Buckswood_Lens_Physics/include"
+    "${ROOT_DIR}/Buckswood_Fake_Diagnostic/include"
+    "${ROOT_DIR}/Buckswood_Film_Emulation/include"
+    "${ROOT_DIR}/Buckswood_Cinematic_Tools/include"
+    "${ROOT_DIR}/Buckswood_Look_DNA/include"
 )
 
 add_executable(premiere_adapter_smoketest

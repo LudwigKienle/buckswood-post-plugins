@@ -47,6 +47,10 @@ COMMON_SOURCES=(
     "$PORT_DIR/src/BuckswoodPremiereAdapter.cpp"
     "$ROOT_DIR/Buckswood_AI_Photorealizer/src/PhotorealizerCore.cpp"
     "$ROOT_DIR/Buckswood_Lens_Physics/src/LensPhysicsCore.cpp"
+    "$ROOT_DIR/Buckswood_Fake_Diagnostic/src/FakeDiagnosticCore.cpp"
+    "$ROOT_DIR/Buckswood_Film_Emulation/src/FilmEmulationCore.cpp"
+    "$ROOT_DIR/Buckswood_Cinematic_Tools/src/CinematicToolsCore.cpp"
+    "$ROOT_DIR/Buckswood_Look_DNA/src/LookDNACore.cpp"
 )
 
 COMMON_INCLUDES=(
@@ -54,6 +58,10 @@ COMMON_INCLUDES=(
     "-I$PREMIERE_SDK_PATH/Examples/Headers/SP"
     "-I$ROOT_DIR/Buckswood_AI_Photorealizer/include"
     "-I$ROOT_DIR/Buckswood_Lens_Physics/include"
+    "-I$ROOT_DIR/Buckswood_Fake_Diagnostic/include"
+    "-I$ROOT_DIR/Buckswood_Film_Emulation/include"
+    "-I$ROOT_DIR/Buckswood_Cinematic_Tools/include"
+    "-I$ROOT_DIR/Buckswood_Look_DNA/include"
     "-I$PORT_DIR/src"
 )
 
@@ -79,11 +87,11 @@ write_info_plist() {
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>2.0.0</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>2.0.0</string>
     <key>CSResourcesFileMapped</key>
     <true/>
 </dict>
@@ -117,17 +125,27 @@ build_effect() {
         -bundle \
         -o "$bundle/Contents/MacOS/$name"
 
+    local preprocessed_resource="$BUILD_DIR/$name.preprocessed.r"
+    "$CLANGXX" \
+        -E \
+        -x c \
+        -P \
+        -DSystemSevenOrLater=1 \
+        -I"$NATIVE_DIR/resources" \
+        -I"$PREMIERE_SDK_PATH/Examples/Headers" \
+        -I"$PREMIERE_SDK_PATH/Examples/Headers/SP" \
+        -isysroot "$MACOS_SDK" \
+        "$resource" \
+        -o "$preprocessed_resource"
+
     local rez_object="$BUILD_DIR/$name.rsrc"
     "$REZ" \
         -o "$rez_object" \
-        -d "SystemSevenOrLater=1" \
         -useDF \
         -script Roman \
         -arch "$RES_ARCH" \
-        -i "$PREMIERE_SDK_PATH/Examples/Headers" \
-        -i "$PREMIERE_SDK_PATH/Examples/Headers/SP" \
         -isysroot "$MACOS_SDK" \
-        "$resource"
+        "$preprocessed_resource"
 
     "$RESMERGER" "$rez_object" -dstIs DF -o "$bundle/Contents/Resources/$name.rsrc"
     if [[ -n "$DEVELOPER_ID_APPLICATION" ]]; then
@@ -151,21 +169,72 @@ build_effect \
     "$NATIVE_DIR/resources/BuckswoodLensPhysicsPiPL.r" \
     "com.buckswood.premiere.lens-physics"
 
+build_effect \
+    "BuckswoodFakeDiagnostic" \
+    "-DBUCKSWOOD_PREMIERE_FAKE_DIAGNOSTIC=1" \
+    "$NATIVE_DIR/resources/BuckswoodFakeDiagnosticPiPL.r" \
+    "com.buckswood.premiere.fake-diagnostic"
+
+build_effect \
+    "BuckswoodFilmEmulation" \
+    "-DBUCKSWOOD_PREMIERE_FILM_EMULATION=1" \
+    "$NATIVE_DIR/resources/BuckswoodFilmEmulationPiPL.r" \
+    "com.buckswood.premiere.film-emulation"
+
+build_effect \
+    "BuckswoodFrameDirector" \
+    "-DBUCKSWOOD_PREMIERE_FRAME_DIRECTOR=1" \
+    "$NATIVE_DIR/resources/BuckswoodFrameDirectorPiPL.r" \
+    "com.buckswood.premiere.frame-director"
+
+build_effect \
+    "BuckswoodRadianceRecover" \
+    "-DBUCKSWOOD_PREMIERE_RADIANCE_RECOVER=1" \
+    "$NATIVE_DIR/resources/BuckswoodRadianceRecoverPiPL.r" \
+    "com.buckswood.premiere.radiance-recover"
+
+build_effect \
+    "BuckswoodTemporalIntegrity" \
+    "-DBUCKSWOOD_PREMIERE_TEMPORAL_INTEGRITY=1" \
+    "$NATIVE_DIR/resources/BuckswoodTemporalIntegrityPiPL.r" \
+    "com.buckswood.premiere.temporal-integrity"
+
+build_effect \
+    "BuckswoodLookDNA" \
+    "-DBUCKSWOOD_PREMIERE_LOOK_DNA=1" \
+    "$NATIVE_DIR/resources/BuckswoodLookDNAPiPL.r" \
+    "com.buckswood.premiere.look-dna"
+
 /usr/bin/xattr -cr "$DIST_DIR" >/dev/null 2>&1 || true
 /usr/bin/find "$DIST_DIR" -name ".DS_Store" -delete
 /usr/bin/find "$DIST_DIR" -name "._*" -delete
 
-ditto -c -k --norsrc --keepParent "$DIST_DIR/BuckswoodAIPhotorealizer.bundle" "$DIST_DIR/BuckswoodAIPhotorealizer_Premiere_macOS.zip"
-ditto -c -k --norsrc --keepParent "$DIST_DIR/BuckswoodLensPhysics.bundle" "$DIST_DIR/BuckswoodLensPhysics_Premiere_macOS.zip"
+PLUGIN_NAMES=(
+    BuckswoodAIPhotorealizer
+    BuckswoodLensPhysics
+    BuckswoodFakeDiagnostic
+    BuckswoodFilmEmulation
+    BuckswoodFrameDirector
+    BuckswoodRadianceRecover
+    BuckswoodTemporalIntegrity
+    BuckswoodLookDNA
+)
+for name in "${PLUGIN_NAMES[@]}"; do
+    ditto -c -k --norsrc --keepParent "$DIST_DIR/$name.bundle" "$DIST_DIR/${name}_Premiere_macOS.zip"
+done
 
 PACKAGE_DIR="$PORT_DIR/release/Buckswood_Premiere_Native_macOS"
 rm -rf "$PACKAGE_DIR"
 mkdir -p "$PACKAGE_DIR/dist" "$PACKAGE_DIR/native/scripts"
-ditto "$DIST_DIR/BuckswoodAIPhotorealizer.bundle" "$PACKAGE_DIR/dist/BuckswoodAIPhotorealizer.bundle"
-ditto "$DIST_DIR/BuckswoodLensPhysics.bundle" "$PACKAGE_DIR/dist/BuckswoodLensPhysics.bundle"
+for name in "${PLUGIN_NAMES[@]}"; do
+    ditto "$DIST_DIR/$name.bundle" "$PACKAGE_DIR/dist/$name.bundle"
+done
 cp "$PORT_DIR/README_PREMIERE_NATIVE.md" "$PACKAGE_DIR/README_PREMIERE_NATIVE.md"
+cp "$PORT_DIR/PREMIERE_EFFECT_GUIDE.md" "$PACKAGE_DIR/PREMIERE_EFFECT_GUIDE.md"
 cp "$NATIVE_DIR/scripts/install_premiere_plugins.command" "$PACKAGE_DIR/native/scripts/install_premiere_plugins.command"
 cp "$NATIVE_DIR/scripts/build_premiere_plugins.sh" "$PACKAGE_DIR/native/scripts/build_premiere_plugins.sh"
+mkdir -p "$PACKAGE_DIR/look_dna"
+cp "$ROOT_DIR/Buckswood_Look_DNA/scripts/analyze_reference.py" "$PACKAGE_DIR/look_dna/analyze_reference.py"
 /usr/bin/xattr -cr "$PACKAGE_DIR" >/dev/null 2>&1 || true
 /usr/bin/find "$PACKAGE_DIR" -name ".DS_Store" -delete
 /usr/bin/find "$PACKAGE_DIR" -name "._*" -delete

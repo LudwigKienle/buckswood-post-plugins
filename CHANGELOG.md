@@ -1,5 +1,40 @@
 # Changelog
 
+## v2.2.0 - 2026-07-15
+
+- Expanded the native Premiere Pro package from two to all eight Buckswood effects.
+- Added macOS universal bundles and Windows x64 `.prm` builds for Fake Diagnostic,
+  Film Emulation, Frame Director, Radiance Recover, Temporal Integrity and Look DNA.
+- Added a spatial stability fallback for Temporal Integrity and fixed-profile slots
+  for Look DNA without claiming unavailable neighbor-frame or file-picker access.
+- Updated both installers to deploy all eight effects to Adobe's `Plug-ins/7.0/MediaCore` path.
+- Added numeric Premiere mode maps and external `.bwlook` profile instructions.
+- Added Look DNA v2 to the unified Resolve, Windows and Nuke packages.
+- Added Cinematic Tools to the Nuke OpenFX release and refreshed all-host checksums.
+
+## Look DNA v2.0.0 - 2026-07-15
+
+- Added Multi Reference DNA with three reference stills, manual B/C mix, and
+  shot-adaptive compatibility weighting.
+- Added an overlapping 3x3 spatial look map with confidence-weighted interpolation.
+- Upgraded temporal analysis from three to five frames while keeping it strictly
+  statistics-only to prevent motion trails and doubled subjects.
+- Added independent shadow, midtone, highlight, and color-density transfer.
+- Added Spatial Look Map, Reference Balance, and Temporal Cut Guard views.
+- Kept existing BWLOOK1 profiles and V1 projects backward compatible.
+
+## Look DNA v1.0.0 - 2026-07-15
+
+- Added `Buckswood Look DNA v1.0`, a reference-still look-matching OpenFX plugin.
+- Added percentile tone transfer, covariance palette matching, six native semantic
+  zones, local-contrast and texture transfer, and configurable identity protection.
+- Added cut-aware temporal stabilization of look statistics without neighboring
+  pixel blending, preventing motion trails and doubled subjects.
+- Added direct JPEG, PNG, and TIFF reference loading on macOS and Windows.
+- Added the portable `BWLOOK1` profile format and a local Python companion analyzer.
+- Added macOS and Windows Resolve builds, an experimental Nuke package, regression
+  tests, bilingual documentation, and signed/notarized installer support.
+
 ## v2.1.0 - 2026-07-15
 
 - Added Buckswood Film Emulation v2.0 with an AI-footage-first negative, print,

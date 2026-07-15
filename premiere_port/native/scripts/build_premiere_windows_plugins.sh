@@ -28,6 +28,7 @@ done
 
 MACOS_SDK="$(xcrun --sdk macosx --show-sdk-path)"
 REZ="$(xcrun -find Rez)"
+HOST_CLANG="$(xcrun -find clang)"
 
 BUILD_DIR="$PORT_DIR/build/native_premiere_windows"
 DIST_DIR="$PORT_DIR/windows_dist"
@@ -42,6 +43,10 @@ COMMON_SOURCES=(
     "$PORT_DIR/src/BuckswoodPremiereAdapter.cpp"
     "$ROOT_DIR/Buckswood_AI_Photorealizer/src/PhotorealizerCore.cpp"
     "$ROOT_DIR/Buckswood_Lens_Physics/src/LensPhysicsCore.cpp"
+    "$ROOT_DIR/Buckswood_Fake_Diagnostic/src/FakeDiagnosticCore.cpp"
+    "$ROOT_DIR/Buckswood_Film_Emulation/src/FilmEmulationCore.cpp"
+    "$ROOT_DIR/Buckswood_Cinematic_Tools/src/CinematicToolsCore.cpp"
+    "$ROOT_DIR/Buckswood_Look_DNA/src/LookDNACore.cpp"
 )
 
 COMMON_FLAGS=(
@@ -61,6 +66,10 @@ COMMON_FLAGS=(
     -I"$PREMIERE_SDK_PATH/Examples/Headers/SP"
     -I"$ROOT_DIR/Buckswood_AI_Photorealizer/include"
     -I"$ROOT_DIR/Buckswood_Lens_Physics/include"
+    -I"$ROOT_DIR/Buckswood_Fake_Diagnostic/include"
+    -I"$ROOT_DIR/Buckswood_Film_Emulation/include"
+    -I"$ROOT_DIR/Buckswood_Cinematic_Tools/include"
+    -I"$ROOT_DIR/Buckswood_Look_DNA/include"
     -I"$PORT_DIR/src"
 )
 
@@ -69,17 +78,27 @@ extract_pipl_payload() {
     local resource="$2"
     local rsrc="$BUILD_DIR/$name.rsrc"
     local payload="$BUILD_DIR/$name.pipl.bin"
+    local preprocessed_resource="$BUILD_DIR/$name.preprocessed.r"
+
+    "$HOST_CLANG" \
+        -E \
+        -x c \
+        -P \
+        -DSystemSevenOrLater=1 \
+        -I"$NATIVE_DIR/resources" \
+        -I"$PREMIERE_SDK_PATH/Examples/Headers" \
+        -I"$PREMIERE_SDK_PATH/Examples/Headers/SP" \
+        -isysroot "$MACOS_SDK" \
+        "$resource" \
+        -o "$preprocessed_resource"
 
     "$REZ" \
         -o "$rsrc" \
-        -d "SystemSevenOrLater=1" \
         -useDF \
         -script Roman \
         -arch x86_64 \
-        -i "$PREMIERE_SDK_PATH/Examples/Headers" \
-        -i "$PREMIERE_SDK_PATH/Examples/Headers/SP" \
         -isysroot "$MACOS_SDK" \
-        "$resource"
+        "$preprocessed_resource"
 
     python3 - "$rsrc" "$payload" <<'PY'
 from pathlib import Path
@@ -170,9 +189,45 @@ build_effect \
     "-DBUCKSWOOD_PREMIERE_LENS=1" \
     "$NATIVE_DIR/resources/BuckswoodLensPhysicsPiPL.r"
 
+build_effect \
+    "BuckswoodFakeDiagnostic" \
+    "-DBUCKSWOOD_PREMIERE_FAKE_DIAGNOSTIC=1" \
+    "$NATIVE_DIR/resources/BuckswoodFakeDiagnosticPiPL.r"
+
+build_effect \
+    "BuckswoodFilmEmulation" \
+    "-DBUCKSWOOD_PREMIERE_FILM_EMULATION=1" \
+    "$NATIVE_DIR/resources/BuckswoodFilmEmulationPiPL.r"
+
+build_effect \
+    "BuckswoodFrameDirector" \
+    "-DBUCKSWOOD_PREMIERE_FRAME_DIRECTOR=1" \
+    "$NATIVE_DIR/resources/BuckswoodFrameDirectorPiPL.r"
+
+build_effect \
+    "BuckswoodRadianceRecover" \
+    "-DBUCKSWOOD_PREMIERE_RADIANCE_RECOVER=1" \
+    "$NATIVE_DIR/resources/BuckswoodRadianceRecoverPiPL.r"
+
+build_effect \
+    "BuckswoodTemporalIntegrity" \
+    "-DBUCKSWOOD_PREMIERE_TEMPORAL_INTEGRITY=1" \
+    "$NATIVE_DIR/resources/BuckswoodTemporalIntegrityPiPL.r"
+
+build_effect \
+    "BuckswoodLookDNA" \
+    "-DBUCKSWOOD_PREMIERE_LOOK_DNA=1" \
+    "$NATIVE_DIR/resources/BuckswoodLookDNAPiPL.r"
+
 python3 - "$INSTALLER_DIR/payload_data.h" \
     photo_prm "$DIST_DIR/BuckswoodAIPhotorealizer.prm" \
-    lens_prm "$DIST_DIR/BuckswoodLensPhysics.prm" <<'PY'
+    lens_prm "$DIST_DIR/BuckswoodLensPhysics.prm" \
+    fake_prm "$DIST_DIR/BuckswoodFakeDiagnostic.prm" \
+    film_prm "$DIST_DIR/BuckswoodFilmEmulation.prm" \
+    frame_prm "$DIST_DIR/BuckswoodFrameDirector.prm" \
+    radiance_prm "$DIST_DIR/BuckswoodRadianceRecover.prm" \
+    temporal_prm "$DIST_DIR/BuckswoodTemporalIntegrity.prm" \
+    lookdna_prm "$DIST_DIR/BuckswoodLookDNA.prm" <<'PY'
 from pathlib import Path
 import sys
 
@@ -214,11 +269,25 @@ PY
 
 "$OBJDUMP" -p "$SETUP_EXE" | grep -E "Subsystem|DLL Name" || true
 
-cp "$DIST_DIR/BuckswoodAIPhotorealizer.prm" "$PACKAGE_DIR/dist/BuckswoodAIPhotorealizer.prm"
-cp "$DIST_DIR/BuckswoodLensPhysics.prm" "$PACKAGE_DIR/dist/BuckswoodLensPhysics.prm"
+PLUGIN_NAMES=(
+    BuckswoodAIPhotorealizer
+    BuckswoodLensPhysics
+    BuckswoodFakeDiagnostic
+    BuckswoodFilmEmulation
+    BuckswoodFrameDirector
+    BuckswoodRadianceRecover
+    BuckswoodTemporalIntegrity
+    BuckswoodLookDNA
+)
+for name in "${PLUGIN_NAMES[@]}"; do
+    cp "$DIST_DIR/$name.prm" "$PACKAGE_DIR/dist/$name.prm"
+done
 cp "$PORT_DIR/README_PREMIERE_WINDOWS.md" "$PACKAGE_DIR/README_PREMIERE_WINDOWS.md"
+cp "$PORT_DIR/PREMIERE_EFFECT_GUIDE.md" "$PACKAGE_DIR/PREMIERE_EFFECT_GUIDE.md"
 cp "$NATIVE_DIR/scripts/install_premiere_plugins_windows.bat" "$PACKAGE_DIR/native/scripts/install_premiere_plugins_windows.bat"
 cp "$NATIVE_DIR/scripts/build_premiere_windows_plugins.sh" "$PACKAGE_DIR/native/scripts/build_premiere_windows_plugins.sh"
+mkdir -p "$PACKAGE_DIR/look_dna"
+cp "$ROOT_DIR/Buckswood_Look_DNA/scripts/analyze_reference.py" "$PACKAGE_DIR/look_dna/analyze_reference.py"
 
 (
     cd "$PORT_DIR/release"

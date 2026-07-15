@@ -31,6 +31,7 @@ declare -a SRC_PKGS=(
     "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer.pkg|Buckswood_Lens_Physics_v0.4_Overdrive_Edge_Guard_Installer.pkg"
     "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer.pkg|Buckswood_Film_Emulation_v2_Installer.pkg"
     "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_Installer.pkg|Buckswood_Cinematic_Tools_v2_Installer.pkg"
+    "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer.pkg|Buckswood_Look_DNA_v2_Installer.pkg"
 )
 
 rm -rf "$V2_DIR"
@@ -67,6 +68,12 @@ Release for DaVinci Resolve / OpenFX on macOS and Windows.
   - Frame Director
   - Radiance Recover
   - Temporal Integrity
+
+- `Buckswood_Look_DNA_v2_Installer.pkg`
+  - three-reference tone, palette, semantic-region, and texture matching
+  - overlapping 3x3 spatial map and five-frame cut-aware analysis
+  - skin, highlight, scene-identity, temporal, and gamut protection
+  - direct image loading plus portable BWLOOK profiles
 
 ## Included Windows Files
 
@@ -123,7 +130,8 @@ for f in \
     "Buckswood_AI_Photorealizer/release/Buckswood_AI_Photorealizer_Installer_SHA256SUMS.txt" \
     "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer_SHA256SUMS.txt" \
     "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer_SHA256SUMS.txt" \
-    "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_SHA256SUMS.txt"; do
+    "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_SHA256SUMS.txt" \
+    "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer_SHA256SUMS.txt"; do
     [[ -f "$ROOT_DIR/$f" ]] && cp "$ROOT_DIR/$f" "$V2_DIR/Checksums/"
 done
 

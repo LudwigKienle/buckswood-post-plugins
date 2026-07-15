@@ -56,7 +56,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     const std::wstring programFiles = envVar(L"ProgramFiles", L"C:\\Program Files");
     const std::wstring programData = envVar(L"ProgramData", L"C:\\ProgramData");
-    const fs::path pluginRoot = fs::path(programFiles) / L"Adobe" / L"Common" / L"Plugins" / L"7.0" / L"MediaCore" / L"Buckswood";
+    const fs::path pluginRoot = fs::path(programFiles) / L"Adobe" / L"Common" / L"Plug-ins" / L"7.0" / L"MediaCore" / L"Buckswood";
 
     struct InstallFile {
         const wchar_t* fileName;
@@ -67,6 +67,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     const std::vector<InstallFile> files = {
         {L"BuckswoodAIPhotorealizer.prm", payload::photo_prm, payload::photo_prm_size},
         {L"BuckswoodLensPhysics.prm", payload::lens_prm, payload::lens_prm_size},
+        {L"BuckswoodFakeDiagnostic.prm", payload::fake_prm, payload::fake_prm_size},
+        {L"BuckswoodFilmEmulation.prm", payload::film_prm, payload::film_prm_size},
+        {L"BuckswoodFrameDirector.prm", payload::frame_prm, payload::frame_prm_size},
+        {L"BuckswoodRadianceRecover.prm", payload::radiance_prm, payload::radiance_prm_size},
+        {L"BuckswoodTemporalIntegrity.prm", payload::temporal_prm, payload::temporal_prm_size},
+        {L"BuckswoodLookDNA.prm", payload::lookdna_prm, payload::lookdna_prm_size},
     };
 
     std::wstring error;
@@ -80,7 +86,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     const fs::path logPath = fs::path(programData) / L"Buckswood" / L"PremierePlugins" / L"install.log";
     const std::string log =
         "Buckswood Premiere Plugins installed.\r\n"
-        "Plugin path: C:\\Program Files\\Adobe\\Common\\Plugins\\7.0\\MediaCore\\Buckswood\r\n";
+        "Plugin path: C:\\Program Files\\Adobe\\Common\\Plug-ins\\7.0\\MediaCore\\Buckswood\r\n";
     writeFile(logPath, reinterpret_cast<const unsigned char*>(log.data()), log.size(), error);
 
     showMessage(

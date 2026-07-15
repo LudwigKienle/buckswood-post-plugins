@@ -25,6 +25,7 @@ Color Page > OpenFX > Buckswood > Buckswood Film Emulation
 Color Page > OpenFX > Buckswood > Buckswood Frame Director
 Color Page > OpenFX > Buckswood > Buckswood Radiance Recover
 Color Page > OpenFX > Buckswood > Buckswood Temporal Integrity
+Color Page > OpenFX > Buckswood > Buckswood Look DNA v2.0
 Color Page > DCTL > Buckswood_Lens_Physics_v01
 Color Page > DCTL > Buckswood_AI_Photorealizer_v01
 
@@ -37,6 +38,7 @@ Buckswood Film Emulation v2.0
 Buckswood Frame Director v2.0
 Buckswood Radiance Recover v2.0
 Buckswood Temporal Integrity v2.0
+Buckswood Look DNA v2.0
 
 Optional ML companion:
 
@@ -48,6 +50,10 @@ inside Radiance Recover.
 Film Emulation v2 also includes a macOS/Linux companion script for optional
 temporal preprocessing. On Windows, use the same Python command from WSL,
 Git Bash, or a normal Python install if the frame paths are adjusted.
+
+Look DNA V2 loads up to three JPEG, PNG, and TIFF references directly. The optional local
+`analyze_reference.py` tool creates portable `.bwlook` profiles for repeatable
+look matching without uploading the source still.
 
 Note:
 

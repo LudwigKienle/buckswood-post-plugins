@@ -1,0 +1,82 @@
+PLUGIN_NAME := BuckswoodLookDNA
+BUNDLE_NAME := $(PLUGIN_NAME).ofx.bundle
+OFX_BINARY := $(PLUGIN_NAME).ofx
+
+ROOT_DIR := ..
+OFX_INCLUDE := $(ROOT_DIR)/third_party/openfx/include
+BUILD_DIR := build
+DIST_DIR := dist
+BUNDLE_DIR := $(DIST_DIR)/$(BUNDLE_NAME)
+
+CXX ?= clang++
+PYTHON ?= python3
+ARCHFLAGS ?= -arch arm64 -arch x86_64
+CXXFLAGS := -std=c++17 -O3 -fvisibility=hidden -Wall -Wextra \
+	$(ARCHFLAGS) -Iinclude -I$(OFX_INCLUDE)
+FRAMEWORKS := -framework ImageIO -framework CoreGraphics -framework CoreFoundation
+LDFLAGS_BUNDLE := -bundle $(FRAMEWORKS)
+
+CORE_SRC := src/LookDNACore.cpp
+LOADER_SRC := src/ReferenceImageLoader.cpp
+OFX_SRC := src/BuckswoodLookDNAOFX.cpp
+
+.PHONY: all bundle smoketest descriptor-test loader-test companion-test install install-user clean check-toolchain
+
+all: bundle smoketest descriptor-test loader-test
+
+check-toolchain:
+	@$(CXX) --version >/dev/null
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(DIST_DIR):
+	mkdir -p $(DIST_DIR)
+
+$(BUILD_DIR)/$(OFX_BINARY): $(CORE_SRC) $(LOADER_SRC) $(OFX_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS_BUNDLE) $(CORE_SRC) $(LOADER_SRC) $(OFX_SRC) -o $@
+
+bundle: $(BUILD_DIR)/$(OFX_BINARY) | $(DIST_DIR)
+	rm -rf $(BUNDLE_DIR)
+	mkdir -p $(BUNDLE_DIR)/Contents/MacOS
+	cp Info.plist $(BUNDLE_DIR)/Contents/Info.plist
+	cp $(BUILD_DIR)/$(OFX_BINARY) $(BUNDLE_DIR)/Contents/MacOS/$(OFX_BINARY)
+	@echo "Built $(BUNDLE_DIR)"
+
+$(BUILD_DIR)/look_dna_smoketest: $(CORE_SRC) src/look_dna_smoketest.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(CORE_SRC) src/look_dna_smoketest.cpp -o $@
+
+smoketest: $(BUILD_DIR)/look_dna_smoketest
+	$(BUILD_DIR)/look_dna_smoketest
+
+$(BUILD_DIR)/reference_loader_smoketest: $(CORE_SRC) $(LOADER_SRC) src/reference_loader_smoketest.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(FRAMEWORKS) $(CORE_SRC) $(LOADER_SRC) src/reference_loader_smoketest.cpp -o $@
+
+loader-test: $(BUILD_DIR)/reference_loader_smoketest
+	$(BUILD_DIR)/reference_loader_smoketest
+
+$(BUILD_DIR)/ofx_descriptor_smoketest: src/ofx_descriptor_smoketest.cpp | $(BUILD_DIR)
+	$(CXX) -std=c++17 -O2 -I$(OFX_INCLUDE) $< -o $@
+
+descriptor-test: bundle $(BUILD_DIR)/ofx_descriptor_smoketest
+	$(BUILD_DIR)/ofx_descriptor_smoketest \
+		$(BUNDLE_DIR)/Contents/MacOS/$(OFX_BINARY)
+
+$(BUILD_DIR)/profile_reader_smoketest: $(CORE_SRC) src/profile_reader_smoketest.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(CORE_SRC) src/profile_reader_smoketest.cpp -o $@
+
+companion-test: $(BUILD_DIR)/profile_reader_smoketest
+	PROFILE_READER="$(abspath $(BUILD_DIR)/profile_reader_smoketest)" $(PYTHON) tests/test_analyzer.py
+
+install: bundle
+	mkdir -p /Library/OFX/Plugins
+	rm -rf /Library/OFX/Plugins/$(BUNDLE_NAME)
+	cp -R $(BUNDLE_DIR) /Library/OFX/Plugins/$(BUNDLE_NAME)
+
+install-user: bundle
+	mkdir -p "$(HOME)/Library/OFX/Plugins"
+	rm -rf "$(HOME)/Library/OFX/Plugins/$(BUNDLE_NAME)"
+	cp -R $(BUNDLE_DIR) "$(HOME)/Library/OFX/Plugins/$(BUNDLE_NAME)"
+
+clean:
+	rm -rf $(BUILD_DIR) $(DIST_DIR)

@@ -5,10 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GH_BIN="${GH_BIN:-gh}"
 REPO_NAME="${REPO_NAME:-buckswood-post-plugins}"
 VISIBILITY="${VISIBILITY:-public}"
-TAG="${TAG:-v2.0.1}"
-TITLE="${TITLE:-Buckswood Post Plugins v2.0.1}"
+TAG="${TAG:-v2.2.0}"
+TITLE="${TITLE:-Buckswood Post Plugins v2.2.0 (Beta)}"
 RELEASE_DIR="${RELEASE_DIR:-}"
-NOTES_FILE="${NOTES_FILE:-$ROOT_DIR/docs/RELEASE_NOTES_v2.0.1.md}"
+NOTES_FILE="${NOTES_FILE:-$ROOT_DIR/docs/RELEASE_NOTES_v2.2.0.md}"
 
 if [[ -z "$RELEASE_DIR" ]]; then
     if [[ -d "$ROOT_DIR/release" ]]; then
@@ -43,6 +43,12 @@ assets=(
     "$RELEASE_DIR/Buckswood_Resolve_Plugins_v2_macOS.zip"
     "$RELEASE_DIR/Buckswood_Resolve_Plugins_v2_Windows_Setup.exe"
     "$RELEASE_DIR/Buckswood_Resolve_Plugins_v2_Windows.zip"
+    "$RELEASE_DIR/Buckswood_Film_Emulation_v2_Installer.dmg"
+    "$RELEASE_DIR/Buckswood_Film_Emulation_v2_Installer.pkg"
+    "$RELEASE_DIR/Buckswood_Cinematic_Tools_v2_Installer.dmg"
+    "$RELEASE_DIR/Buckswood_Cinematic_Tools_v2_Installer.pkg"
+    "$RELEASE_DIR/Buckswood_Look_DNA_v2_Installer.dmg"
+    "$RELEASE_DIR/Buckswood_Look_DNA_v2_Installer.pkg"
     "$RELEASE_DIR/Buckswood_Nuke_OFX_v2.zip"
     "$RELEASE_DIR/Buckswood_Premiere_Native_macOS.zip"
     "$RELEASE_DIR/Buckswood_Premiere_Native_Windows.zip"
@@ -57,11 +63,16 @@ for asset in "${assets[@]}"; do
 done
 
 if "$GH_BIN" release view "$TAG" >/dev/null 2>&1; then
+    "$GH_BIN" release edit "$TAG" \
+        --title "$TITLE" \
+        --notes-file "$NOTES_FILE" \
+        --prerelease
     "$GH_BIN" release upload "$TAG" "${existing_assets[@]}" --clobber
 else
     "$GH_BIN" release create "$TAG" "${existing_assets[@]}" \
         --title "$TITLE" \
-        --notes-file "$NOTES_FILE"
+        --notes-file "$NOTES_FILE" \
+        --prerelease
 fi
 
 "$GH_BIN" repo view --web >/dev/null 2>&1 || true

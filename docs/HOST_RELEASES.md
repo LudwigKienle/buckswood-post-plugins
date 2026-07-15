@@ -20,6 +20,7 @@ Included tools:
 - Buckswood Frame Director v2.0
 - Buckswood Radiance Recover v2.0
 - Buckswood Temporal Integrity v2.0
+- Buckswood Look DNA v2.0
 
 Additional standalone macOS assets:
 
@@ -27,6 +28,8 @@ Additional standalone macOS assets:
 - `Buckswood_Cinematic_Tools_v2_Installer.dmg`
 - `Buckswood_Film_Emulation_v2_Installer.pkg`
 - `Buckswood_Film_Emulation_v2_Installer.dmg`
+- `Buckswood_Look_DNA_v2_Installer.pkg`
+- `Buckswood_Look_DNA_v2_Installer.dmg`
 
 The Cinematic Tools suite and Film Emulation are included in the unified Windows setup and manual ZIP.
 
@@ -46,8 +49,12 @@ Included tools:
 - Buckswood Lens Physics v0.4
 - Buckswood AI Photorealizer v0.2
 - Buckswood Film Emulation v2.0
+- Buckswood Look DNA v2.0
 
 Temporal modes in Fake Diagnostic depend on host frame access. If temporal access is limited in Nuke, use the spatial diagnostic modes first.
+
+Look DNA can load direct reference images on macOS and Windows. Its portable
+`.bwlook` profiles are recommended for repeatable Nuke jobs.
 
 ## Premiere Pro
 
@@ -61,9 +68,20 @@ Release assets:
 
 Included tools:
 
+- Buckswood Fake Diagnostic
 - Buckswood Lens Physics
 - Buckswood AI Photorealizer
+- Buckswood Film Emulation
+- Buckswood Frame Director
+- Buckswood Radiance Recover
+- Buckswood Temporal Integrity
+- Buckswood Look DNA
 
-Fake Diagnostic and Film Emulation are not included in the Premiere native package yet. Their temporal, diagnostic, and film-process parameter surfaces need a dedicated Premiere PiPL/native port pass instead of simply copying the Resolve OFX wrapper.
+The Premiere PiPL video-filter API supplies the current frame only. Fake
+Diagnostic and Film Emulation therefore expose their spatial pipelines without
+temporal reconstruction, Frame Director uses current-frame saliency, and
+Temporal Integrity uses a documented spatial stability fallback. Look DNA uses
+three portable `.bwlook` profile slots plus three built-in reference profiles
+because the native PiPL control surface has no file-path picker.
 
 Premiere builds require the Adobe Premiere Pro C++ SDK. Do not commit the SDK to GitHub.
