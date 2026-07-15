@@ -23,6 +23,7 @@ mkdir -p "$NUKE_DIR"
 make -C "$ROOT_DIR/Buckswood_Fake_Diagnostic" bundle
 make -C "$ROOT_DIR/Buckswood_Lens_Physics" bundle
 make -C "$ROOT_DIR/Buckswood_AI_Photorealizer" bundle
+make -C "$ROOT_DIR/Buckswood_Film_Emulation" bundle
 
 if [[ ! -d "$ROOT_DIR/windows_release/Buckswood_Resolve_Plugins_Windows/OFX/Plugins" ]]; then
     bash "$ROOT_DIR/scripts/build_windows_release.sh"
@@ -34,10 +35,12 @@ mkdir -p "$PACKAGE_DIR/macOS" "$PACKAGE_DIR/Windows"
 /usr/bin/ditto --norsrc "$ROOT_DIR/Buckswood_Fake_Diagnostic/dist/BuckswoodFakeDiagnostic.ofx.bundle" "$PACKAGE_DIR/macOS/BuckswoodFakeDiagnostic.ofx.bundle"
 /usr/bin/ditto --norsrc "$ROOT_DIR/Buckswood_Lens_Physics/dist/BuckswoodLensPhysics.ofx.bundle" "$PACKAGE_DIR/macOS/BuckswoodLensPhysics.ofx.bundle"
 /usr/bin/ditto --norsrc "$ROOT_DIR/Buckswood_AI_Photorealizer/dist/BuckswoodAIPhotorealizer.ofx.bundle" "$PACKAGE_DIR/macOS/BuckswoodAIPhotorealizer.ofx.bundle"
+/usr/bin/ditto --norsrc "$ROOT_DIR/Buckswood_Film_Emulation/dist/BuckswoodFilmEmulation.ofx.bundle" "$PACKAGE_DIR/macOS/BuckswoodFilmEmulation.ofx.bundle"
 
 /usr/bin/ditto --norsrc "$ROOT_DIR/windows_release/Buckswood_Resolve_Plugins_Windows/OFX/Plugins/BuckswoodFakeDiagnostic.ofx.bundle" "$PACKAGE_DIR/Windows/BuckswoodFakeDiagnostic.ofx.bundle"
 /usr/bin/ditto --norsrc "$ROOT_DIR/windows_release/Buckswood_Resolve_Plugins_Windows/OFX/Plugins/BuckswoodLensPhysics.ofx.bundle" "$PACKAGE_DIR/Windows/BuckswoodLensPhysics.ofx.bundle"
 /usr/bin/ditto --norsrc "$ROOT_DIR/windows_release/Buckswood_Resolve_Plugins_Windows/OFX/Plugins/BuckswoodAIPhotorealizer.ofx.bundle" "$PACKAGE_DIR/Windows/BuckswoodAIPhotorealizer.ofx.bundle"
+/usr/bin/ditto --norsrc "$ROOT_DIR/windows_release/Buckswood_Resolve_Plugins_Windows/OFX/Plugins/BuckswoodFilmEmulation.ofx.bundle" "$PACKAGE_DIR/Windows/BuckswoodFilmEmulation.ofx.bundle"
 
 for bundle in "$PACKAGE_DIR"/macOS/*.ofx.bundle; do
     if [[ -n "$DEVELOPER_ID_APPLICATION" ]]; then
@@ -57,6 +60,7 @@ Included OFX plug-ins:
 - Buckswood Fake Diagnostic v2.1
 - Buckswood Lens Physics v0.4 Overdrive Edge Guard
 - Buckswood AI Photorealizer v0.2
+- Buckswood Film Emulation v2.0
 
 Nuke can load OpenFX plug-ins directly. This package is experimental because
 the plug-ins are primarily tested in DaVinci Resolve first.

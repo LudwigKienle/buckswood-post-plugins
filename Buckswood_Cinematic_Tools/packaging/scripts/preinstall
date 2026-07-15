@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+PLUGIN="/Library/OFX/Plugins/BuckswoodCinematicTools.ofx.bundle"
+/bin/rm -rf "$PLUGIN"
+
+CONSOLE_USER="$(/usr/bin/stat -f %Su /dev/console 2>/dev/null || true)"
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+    /bin/rm -rf "/Users/$CONSOLE_USER/Library/OFX/Plugins/BuckswoodCinematicTools.ofx.bundle"
+fi
+
+exit 0

@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+PLUGIN="/Library/OFX/Plugins/BuckswoodCinematicTools.ofx.bundle"
+if [ -d "$PLUGIN" ]; then
+    /usr/bin/xattr -dr com.apple.quarantine "$PLUGIN" >/dev/null 2>&1 || true
+fi
+
+for CACHE in \
+    /Users/*/Library/"Application Support"/"Blackmagic Design"/"DaVinci Resolve"/OFXPluginCache*.xml \
+    /var/root/Library/"Application Support"/"Blackmagic Design"/"DaVinci Resolve"/OFXPluginCache*.xml; do
+    /bin/rm -f "$CACHE" >/dev/null 2>&1 || true
+done
+
+exit 0

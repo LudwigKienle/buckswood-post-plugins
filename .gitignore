@@ -51,6 +51,10 @@ premiere_port/sdk_synth_build/
 
 # Large local toolchains and caches
 third_party/toolchains/
+.ml-venv/
+*/.ml-venv/
+*.bwrcache
+*.npy
 third_party/openfx/Documentation/
 third_party/openfx/Examples/
 third_party/openfx/HostSupport/

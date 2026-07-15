@@ -22,7 +22,10 @@ mkdir -p "$BUILD_DIR" "$PUBLIC_DIR"
 mkdir -p "$PAYLOAD_DIR/OFX/Plugins/BuckswoodFakeDiagnostic.ofx.bundle/Contents/Win64"
 mkdir -p "$PAYLOAD_DIR/OFX/Plugins/BuckswoodLensPhysics.ofx.bundle/Contents/Win64"
 mkdir -p "$PAYLOAD_DIR/OFX/Plugins/BuckswoodAIPhotorealizer.ofx.bundle/Contents/Win64"
+mkdir -p "$PAYLOAD_DIR/OFX/Plugins/BuckswoodFilmEmulation.ofx.bundle/Contents/Win64"
+mkdir -p "$PAYLOAD_DIR/OFX/Plugins/BuckswoodCinematicTools.ofx.bundle/Contents/Win64"
 mkdir -p "$PAYLOAD_DIR/ResolveLUT"
+mkdir -p "$PAYLOAD_DIR/ML_Companion/scripts" "$PAYLOAD_DIR/ML_Companion/models/hdrtvnet_plus"
 
 COMMON_FLAGS=(
   --target=x86_64-w64-windows-gnu
@@ -59,14 +62,50 @@ COMMON_FLAGS=(
   "$ROOT_DIR/Buckswood_AI_Photorealizer/src/BuckswoodAIPhotorealizerOFX.cpp" \
   -o "$BUILD_DIR/BuckswoodAIPhotorealizer.ofx"
 
+"$CXX" "${COMMON_FLAGS[@]}" \
+  -I"$ROOT_DIR/Buckswood_Film_Emulation/include" \
+  -I"$ROOT_DIR/third_party/openfx/include" \
+  -shared \
+  "$ROOT_DIR/Buckswood_Film_Emulation/src/FilmEmulationCore.cpp" \
+  "$ROOT_DIR/Buckswood_Film_Emulation/src/BuckswoodFilmEmulationOFX.cpp" \
+  -o "$BUILD_DIR/BuckswoodFilmEmulation.ofx"
+
+"$CXX" "${COMMON_FLAGS[@]}" \
+  -I"$ROOT_DIR/Buckswood_Cinematic_Tools/include" \
+  -I"$ROOT_DIR/third_party/openfx/include" \
+  -shared \
+  "$ROOT_DIR/Buckswood_Cinematic_Tools/src/CinematicToolsCore.cpp" \
+  "$ROOT_DIR/Buckswood_Cinematic_Tools/src/BuckswoodCinematicToolsOFX.cpp" \
+  -o "$BUILD_DIR/BuckswoodCinematicTools.ofx"
+
 cp "$BUILD_DIR/BuckswoodFakeDiagnostic.ofx" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodFakeDiagnostic.ofx.bundle/Contents/Win64/BuckswoodFakeDiagnostic.ofx"
 cp "$BUILD_DIR/BuckswoodLensPhysics.ofx" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodLensPhysics.ofx.bundle/Contents/Win64/BuckswoodLensPhysics.ofx"
 cp "$BUILD_DIR/BuckswoodAIPhotorealizer.ofx" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodAIPhotorealizer.ofx.bundle/Contents/Win64/BuckswoodAIPhotorealizer.ofx"
+cp "$BUILD_DIR/BuckswoodFilmEmulation.ofx" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodFilmEmulation.ofx.bundle/Contents/Win64/BuckswoodFilmEmulation.ofx"
+cp "$BUILD_DIR/BuckswoodCinematicTools.ofx" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodCinematicTools.ofx.bundle/Contents/Win64/BuckswoodCinematicTools.ofx"
 cp "$ROOT_DIR/Buckswood_Fake_Diagnostic/Info.plist" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodFakeDiagnostic.ofx.bundle/Contents/Info.plist"
 cp "$ROOT_DIR/Buckswood_Lens_Physics/Info.plist" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodLensPhysics.ofx.bundle/Contents/Info.plist"
 cp "$ROOT_DIR/Buckswood_AI_Photorealizer/Info.plist" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodAIPhotorealizer.ofx.bundle/Contents/Info.plist"
+cp "$ROOT_DIR/Buckswood_Film_Emulation/Info.plist" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodFilmEmulation.ofx.bundle/Contents/Info.plist"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/Info.plist" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodCinematicTools.ofx.bundle/Contents/Info.plist"
 cp "$ROOT_DIR/Buckswood_Lens_Physics/dctl/Buckswood_Lens_Physics_v01.dctl" "$PAYLOAD_DIR/ResolveLUT/"
 cp "$ROOT_DIR/Buckswood_AI_Photorealizer/dctl/Buckswood_AI_Photorealizer_v01.dctl" "$PAYLOAD_DIR/ResolveLUT/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/scripts/radiance_cache.py" "$PAYLOAD_DIR/ML_Companion/scripts/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/scripts/hdrtvnet_plus_adapter.py" "$PAYLOAD_DIR/ML_Companion/scripts/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/scripts/setup_ml_backend.sh" "$PAYLOAD_DIR/ML_Companion/scripts/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/scripts/setup_ml_backend_windows.bat" "$PAYLOAD_DIR/ML_Companion/scripts/"
+cp "$ROOT_DIR/Buckswood_Film_Emulation/scripts/temporal_ml_reconstruct.py" "$PAYLOAD_DIR/ML_Companion/scripts/"
+cp "$ROOT_DIR/Buckswood_Film_Emulation/scripts/setup_temporal_ml_backend.sh" "$PAYLOAD_DIR/ML_Companion/scripts/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/requirements-companion.txt" "$PAYLOAD_DIR/ML_Companion/"
+cp "$ROOT_DIR/Buckswood_Film_Emulation/requirements-temporal-ml.txt" "$PAYLOAD_DIR/ML_Companion/"
+cp "$ROOT_DIR/Buckswood_Film_Emulation/TEMPORAL_ML_BACKEND.md" "$PAYLOAD_DIR/ML_Companion/"
+cp "$ROOT_DIR/Buckswood_Film_Emulation/RESEARCH_NOTES.md" "$PAYLOAD_DIR/ML_Companion/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/models/hdrtvnet_plus/AGCM.pth" "$PAYLOAD_DIR/ML_Companion/models/hdrtvnet_plus/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/models/hdrtvnet_plus/ATTRIBUTION.md" "$PAYLOAD_DIR/ML_Companion/models/hdrtvnet_plus/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/models/hdrtvnet_plus/LICENSE_HDRTVNet-plus" "$PAYLOAD_DIR/ML_Companion/models/hdrtvnet_plus/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/DOCUMENTATION_DE.md" "$PAYLOAD_DIR/ML_Companion/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/DOCUMENTATION_EN.md" "$PAYLOAD_DIR/ML_Companion/"
+cp "$ROOT_DIR/Buckswood_Cinematic_Tools/OPEN_SOURCE_ROADMAP.md" "$PAYLOAD_DIR/ML_Companion/"
 cp "$WINDOWS_DIR/README_WINDOWS.txt" "$PUBLIC_DIR/README_WINDOWS.txt"
 
 python3 - "$INSTALLER_DIR/payload_data.h" \
@@ -76,6 +115,10 @@ python3 - "$INSTALLER_DIR/payload_data.h" \
   lens_ofx "$BUILD_DIR/BuckswoodLensPhysics.ofx" \
   photo_info_plist "$ROOT_DIR/Buckswood_AI_Photorealizer/Info.plist" \
   photo_ofx "$BUILD_DIR/BuckswoodAIPhotorealizer.ofx" \
+  film_info_plist "$ROOT_DIR/Buckswood_Film_Emulation/Info.plist" \
+  film_ofx "$BUILD_DIR/BuckswoodFilmEmulation.ofx" \
+  cinematic_info_plist "$ROOT_DIR/Buckswood_Cinematic_Tools/Info.plist" \
+  cinematic_ofx "$BUILD_DIR/BuckswoodCinematicTools.ofx" \
   lens_dctl "$ROOT_DIR/Buckswood_Lens_Physics/dctl/Buckswood_Lens_Physics_v01.dctl" \
   photo_dctl "$ROOT_DIR/Buckswood_AI_Photorealizer/dctl/Buckswood_AI_Photorealizer_v01.dctl" <<'PY'
 import pathlib

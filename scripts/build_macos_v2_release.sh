@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Assemble the unified "Buckswood Resolve Plugins v2" macOS release from the
 # per-plugin installers, then build the public DMG/ZIP and refresh checksums.
-# Run the three per-plugin build_macos_installer.sh scripts first.
+# Run the per-plugin build_macos_installer.sh scripts first.
 set -euo pipefail
 export COPYFILE_DISABLE=1
 
@@ -29,6 +29,8 @@ declare -a SRC_PKGS=(
     "Buckswood_Fake_Diagnostic/release/Buckswood_Fake_Diagnostic_Installer.pkg|Buckswood_Fake_Diagnostic_v2.1_Installer.pkg"
     "Buckswood_AI_Photorealizer/release/Buckswood_AI_Photorealizer_Installer.pkg|Buckswood_AI_Photorealizer_v0.2_Installer.pkg"
     "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer.pkg|Buckswood_Lens_Physics_v0.4_Overdrive_Edge_Guard_Installer.pkg"
+    "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer.pkg|Buckswood_Film_Emulation_v2_Installer.pkg"
+    "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_Installer.pkg|Buckswood_Cinematic_Tools_v2_Installer.pkg"
 )
 
 rm -rf "$V2_DIR"
@@ -56,10 +58,20 @@ Release for DaVinci Resolve / OpenFX on macOS and Windows.
   - reduced artificial CA/fringing outlines on hard edges
   - preserves lens character in texture, glow, and highlights
 
+- `Buckswood_Film_Emulation_v2_Installer.pkg`
+  - AI-footage-first film finishing
+  - negative/print process, film compression, printer lights, grain, halation, bloom
+  - Temporal AI Reconstruction and optional ML companion notes
+
+- `Buckswood_Cinematic_Tools_v2_Installer.pkg`
+  - Frame Director
+  - Radiance Recover
+  - Temporal Integrity
+
 ## Included Windows Files
 
 - `Windows/Buckswood_Resolve_Plugins_v2_Windows_Setup.exe`
-  - installs all three OFX plugins to `C:\Program Files\Common Files\OFX\Plugins`
+  - installs the Resolve OFX plugins to `C:\Program Files\Common Files\OFX\Plugins`
   - installs the Lens Physics and AI Photorealizer DCTL fallbacks
 
 - `Windows/Buckswood_Resolve_Plugins_v2_Windows_Manual.zip`
@@ -68,7 +80,7 @@ Release for DaVinci Resolve / OpenFX on macOS and Windows.
 ## Install on macOS
 
 1. Quit DaVinci Resolve completely.
-2. Run all three `.pkg` installers in the `Installers` folder.
+2. Run the `.pkg` installers in the `Installers` folder.
 3. Restart DaVinci Resolve.
 4. In Resolve, open `Color Page > OpenFX > Buckswood`.
 
@@ -109,7 +121,9 @@ done
 for f in \
     "Buckswood_Fake_Diagnostic/release/Buckswood_Fake_Diagnostic_Installer_SHA256SUMS.txt" \
     "Buckswood_AI_Photorealizer/release/Buckswood_AI_Photorealizer_Installer_SHA256SUMS.txt" \
-    "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer_SHA256SUMS.txt"; do
+    "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer_SHA256SUMS.txt" \
+    "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer_SHA256SUMS.txt" \
+    "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_SHA256SUMS.txt"; do
     [[ -f "$ROOT_DIR/$f" ]] && cp "$ROOT_DIR/$f" "$V2_DIR/Checksums/"
 done
 
