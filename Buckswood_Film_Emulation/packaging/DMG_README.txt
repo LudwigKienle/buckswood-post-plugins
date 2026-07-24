@@ -1,9 +1,9 @@
-Buckswood Film Emulation v2.0
+Buckswood Film Emulation v2.1
 
 Install:
 1. Run Buckswood_Film_Emulation_v2_Installer.pkg.
 2. Restart DaVinci Resolve.
-3. Open Color Page > OpenFX > Buckswood > Buckswood Film Emulation v2.0.
+3. Open Color Page > OpenFX > Buckswood > Buckswood Film Emulation v2.1.
 
 Recommended AI footage start:
 - Input Space: AI Footage Rec.709

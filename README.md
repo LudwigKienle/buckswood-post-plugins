@@ -4,14 +4,14 @@ Free cinematic post-production tools for DaVinci Resolve, with native Premiere P
 
 This repository contains the source for eight Buckswood Resolve tools:
 
-- **Buckswood Fake Diagnostic v2.1** - a supervisor-style diagnostic overlay for AI, CG, and compositing shots that feel fake.
+- **Buckswood Fake Diagnostic v2.2** - a supervisor-style diagnostic overlay for AI, CG, and compositing shots that feel fake.
 - **Buckswood Lens Physics v0.5** - lossless Metal/OpenCL acceleration, lens-character simulation, overdrive edge protection, chromatic aberration, bloom, coma, vignette, and IMAX/Dune-inspired presets.
 - **Buckswood AI Photorealizer v0.3** - lossless Metal/OpenCL acceleration and a conservative de-plastic and photoreal assist pass for AI/CG/phone footage.
-- **Buckswood Film Emulation v2.0** - AI-footage-first film finishing with negative/print process controls, texture-only mode, temporal reconstruction, grain, halation, bloom, and printer-light trims.
-- **Buckswood Frame Director v2.0** - five-frame, cut-aware composition assistance with Subject Lock.
-- **Buckswood Radiance Recover v2.0** - floating-point SDR radiance expansion with an optional HDRTVNet++ cache.
-- **Buckswood Temporal Integrity v2.0** - five-frame repair with confidence and ghost-risk protection.
-- **Buckswood Look DNA v2.1** - three-reference, spatial and five-frame look matching with native Browse / Load file pickers, tone, palette, semantic-region, texture, identity, gamut, and cut protection.
+- **Buckswood Film Emulation v2.1** - AI-footage-first film finishing with negative/print process controls, texture-only mode, temporal reconstruction, grain, halation, bloom, and printer-light trims.
+- **Buckswood Frame Director v2.1** - five-frame, cut-aware composition assistance with Subject Lock.
+- **Buckswood Radiance Recover v2.1** - floating-point SDR radiance expansion with an optional HDRTVNet++ cache.
+- **Buckswood Temporal Integrity v2.1** - five-frame repair with confidence and ghost-risk protection.
+- **Buckswood Look DNA v2.2** - three-reference, spatial and five-frame look matching with native Browse / Load file pickers, tone, palette, semantic-region, texture, identity, gamut, and cut protection.
 
 The primary release target is DaVinci Resolve/OpenFX. Premiere Pro and Nuke builds are packaged as separate host downloads.
 

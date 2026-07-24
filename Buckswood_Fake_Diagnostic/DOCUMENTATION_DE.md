@@ -2,7 +2,7 @@
 
 Deutschsprachige Dokumentation fuer DaVinci Resolve
 
-Version: 2.0.0  
+Version: 2.2.0
 Plugin-Typ: OpenFX / OFX  
 Host: DaVinci Resolve  
 Kategorie in Resolve: `Buckswood`  

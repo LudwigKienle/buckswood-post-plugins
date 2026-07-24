@@ -63,14 +63,14 @@ Buckswood OFX for Nuke v2
 
 Included OFX plug-ins:
 
-- Buckswood Fake Diagnostic v2.1
+- Buckswood Fake Diagnostic v2.2
 - Buckswood Lens Physics v0.5 GPU Performance
 - Buckswood AI Photorealizer v0.3 GPU Performance
-- Buckswood Film Emulation v2.0
-- Buckswood Frame Director v2.0
-- Buckswood Radiance Recover v2.0
-- Buckswood Temporal Integrity v2.0
-- Buckswood Look DNA v2.1
+- Buckswood Film Emulation v2.1
+- Buckswood Frame Director v2.1
+- Buckswood Radiance Recover v2.1
+- Buckswood Temporal Integrity v2.1
+- Buckswood Look DNA v2.2
 
 Nuke can load OpenFX plug-ins directly. This package is experimental because
 the plug-ins are primarily tested in DaVinci Resolve first.

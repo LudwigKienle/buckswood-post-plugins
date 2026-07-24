@@ -77,7 +77,16 @@ using TemporalContext = TemporalContextT<Sampler>;
 
 class FakeDiagnosticCore {
 public:
+    struct PreparedState {
+        float weightSum;
+        int noiseSeedBase;
+        int noiseSeedAlt;
+    };
+
     static Controls defaultControls();
+    static PreparedState prepare(
+        const FrameInfo& frame,
+        const Controls& controls);
 
     template <typename SamplerT>
     static Scores analyzePixel(
@@ -98,7 +107,27 @@ public:
         int viewMode,
         const TemporalContextT<SamplerT>* temporal = nullptr);
 
+    template <typename SamplerT>
+    static Pixel processPixel(
+        const SamplerT& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const Controls& controls,
+        const PreparedState& prepared,
+        int viewMode,
+        const TemporalContextT<SamplerT>* temporal = nullptr);
+
 private:
+    struct Analysis {
+        Pixel input;
+        Pixel crossBlur;
+        Pixel temporalAverage;
+        Scores scores;
+        float temporalDifference;
+        bool hasTemporalAverage;
+    };
+
     static float clamp01(float value)
     {
         return std::min(1.0f, std::max(0.0f, value));
@@ -130,9 +159,14 @@ private:
 
     static float hash01(int x, int y, int z)
     {
-        int n = x * 15731 + y * 789221 + z * 1376312589;
-        n = (n << 13) ^ n;
-        const int hashed = (n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff;
+        std::uint32_t n =
+            static_cast<std::uint32_t>(x) * 15731u +
+            static_cast<std::uint32_t>(y) * 789221u +
+            static_cast<std::uint32_t>(z) * 1376312589u;
+        n = (n << 13u) ^ n;
+        const std::uint32_t hashed =
+            (n * (n * n * 15731u + 789221u) + 1376312589u) &
+            0x7fffffffu;
         return static_cast<float>(hashed) / 2147483647.0f;
     }
 
@@ -175,6 +209,15 @@ private:
     static Pixel categoryColor(const Scores& scores);
 
     template <typename SamplerT>
+    static Analysis analyzeContext(
+        const SamplerT& sampler,
+        int x,
+        int y,
+        const Controls& controls,
+        const PreparedState& prepared,
+        const TemporalContextT<SamplerT>* temporal);
+
+    template <typename SamplerT>
     static Pixel blur5(const SamplerT& sampler, int x, int y)
     {
         Pixel c = sampler.sample(static_cast<float>(x), static_cast<float>(y));
@@ -200,16 +243,12 @@ private:
         const Scores& spatialScores,
         const TemporalContextT<SamplerT>* temporal);
 
-    template <typename SamplerT>
     static Pixel applyAssist(
-        const SamplerT& sampler,
         int x,
         int y,
-        const FrameInfo& frame,
-        Pixel input,
-        const Scores& scores,
+        const Analysis& analysis,
         const Controls& controls,
-        const TemporalContextT<SamplerT>* temporal);
+        const PreparedState& prepared);
 };
 
 template <typename SamplerT>
@@ -221,8 +260,24 @@ Scores FakeDiagnosticCore::analyzePixel(
     const Controls& controls,
     const TemporalContextT<SamplerT>* temporal)
 {
-    (void)frame;
+    return analyzeContext(
+        sampler,
+        x,
+        y,
+        controls,
+        prepare(frame, controls),
+        temporal).scores;
+}
 
+template <typename SamplerT>
+FakeDiagnosticCore::Analysis FakeDiagnosticCore::analyzeContext(
+    const SamplerT& sampler,
+    int x,
+    int y,
+    const Controls& controls,
+    const PreparedState& prepared,
+    const TemporalContextT<SamplerT>* temporal)
+{
     const Pixel c = sampler.sample(static_cast<float>(x), static_cast<float>(y));
     const Pixel l = sampler.sample(static_cast<float>(x - 1), static_cast<float>(y));
     const Pixel r = sampler.sample(static_cast<float>(x + 1), static_cast<float>(y));
@@ -267,22 +322,74 @@ Scores FakeDiagnosticCore::analyzePixel(
     scores.edge = clamp01(smoothstep(0.10f, 0.42f, gradient) * (0.35f + 0.65f * localClean));
     scores.grade = clamp01(std::max(smoothstep(0.68f, 1.0f, saturation), smoothstep(0.92f, 1.06f, maxChannel)));
     scores.texture = clamp01(localClean * (1.0f - smoothstep(0.12f, 0.38f, gradient)) * midtoneMask);
-    scores.temporal = temporalRisk(sampler, x, y, scores, temporal);
 
-    const float weightSum = std::max(
-        0.001f,
-        controls.plasticWeight + controls.highlightWeight + controls.edgeWeight + controls.gradeWeight + controls.textureWeight +
-            controls.temporalWeight);
+    Pixel temporalAverage{0.0f, 0.0f, 0.0f, c.a};
+    float temporalTotal = 0.0f;
+    float temporalCount = 0.0f;
+    auto accumulateTemporal = [&](const SamplerT* other) {
+        if (!other) {
+            return;
+        }
+        const Pixel p = other->sample(static_cast<float>(x), static_cast<float>(y));
+        const float lumaDelta = std::fabs(cy - luma(p));
+        const float chromaDelta =
+            (std::fabs(c.r - p.r) + std::fabs(c.g - p.g) + std::fabs(c.b - p.b)) *
+            0.333f;
+        temporalTotal += lumaDelta * 0.65f + chromaDelta * 0.35f;
+        temporalAverage = add(temporalAverage, p);
+        temporalCount += 1.0f;
+    };
+    if (temporal && temporal->hasPrevious) {
+        accumulateTemporal(temporal->previous);
+    }
+    if (temporal && temporal->hasNext) {
+        accumulateTemporal(temporal->next);
+    }
+    const float difference =
+        temporalCount > 0.0f
+        ? clamp01(temporalTotal / temporalCount)
+        : 0.0f;
+    if (temporalCount > 0.0f) {
+        temporalAverage = mul(temporalAverage, 1.0f / temporalCount);
+        temporalAverage.a = c.a;
+    }
+
+    if (temporalCount > 0.0f) {
+        const float fakeSpatial =
+            scores.plastic * 0.35f +
+            scores.edge * 0.25f +
+            scores.texture * 0.25f +
+            scores.highlight * 0.10f +
+            scores.grade * 0.05f;
+        const float tooStatic =
+            (1.0f - smoothstep(0.006f, 0.055f, difference)) * fakeSpatial;
+        const float temporalFlicker =
+            smoothstep(0.10f, 0.32f, difference) *
+            (scores.highlight * 0.45f + scores.grade * 0.35f + 0.20f);
+        scores.temporal =
+            clamp01(std::max(tooStatic, temporalFlicker * 0.65f));
+    } else {
+        scores.temporal = 0.0f;
+    }
+
     scores.overall = clamp01(
         controls.sensitivity *
-        (scores.plastic * controls.plasticWeight +
-         scores.highlight * controls.highlightWeight +
-         scores.edge * controls.edgeWeight +
-         scores.grade * controls.gradeWeight +
-         scores.texture * controls.textureWeight +
-         scores.temporal * controls.temporalWeight) /
-            weightSum);
-    return scores;
+            (scores.plastic * controls.plasticWeight +
+             scores.highlight * controls.highlightWeight +
+             scores.edge * controls.edgeWeight +
+             scores.grade * controls.gradeWeight +
+             scores.texture * controls.textureWeight +
+             scores.temporal * controls.temporalWeight) /
+            prepared.weightSum);
+
+    return Analysis{
+        c,
+        mul(add(add(add(add(c, l), r), u), d), 0.2f),
+        temporalAverage,
+        scores,
+        difference,
+        temporalCount > 0.0f,
+    };
 }
 
 template <typename SamplerT>
@@ -347,19 +454,17 @@ float FakeDiagnosticCore::temporalRisk(
     return clamp01(std::max(tooStatic, temporalFlicker * 0.65f));
 }
 
-template <typename SamplerT>
-Pixel FakeDiagnosticCore::applyAssist(
-    const SamplerT& sampler,
+inline Pixel FakeDiagnosticCore::applyAssist(
     int x,
     int y,
-    const FrameInfo& frame,
-    Pixel input,
-    const Scores& scores,
+    const Analysis& analysis,
     const Controls& controls,
-    const TemporalContextT<SamplerT>* temporal)
+    const PreparedState& prepared)
 {
+    const Pixel input = analysis.input;
+    const Scores& scores = analysis.scores;
     Pixel out = input;
-    const Pixel blur = blur5(sampler, x, y);
+    const Pixel blur = analysis.crossBlur;
     const Pixel detail = sub(input, blur);
     const float correction = clamp01(controls.correctionStrength) * scores.overall;
 
@@ -385,31 +490,22 @@ Pixel FakeDiagnosticCore::applyAssist(
         out.b = rollChannel(out.b);
     }
 
-    const float noiseBase = (hash01(x, y, frame.frameIndex + static_cast<int>(controls.seed * 13.0f)) - 0.5f);
-    const float noiseAlt = (hash01(x + 17, y - 11, frame.frameIndex + static_cast<int>(controls.seed * 29.0f)) - 0.5f);
+    const float noiseBase =
+        hash01(x, y, prepared.noiseSeedBase) - 0.5f;
+    const float noiseAlt =
+        hash01(x + 17, y - 11, prepared.noiseSeedAlt) - 0.5f;
     const float textureAmount = controls.sensorTexture * correction * (0.35f + 0.65f * scores.texture) * 0.045f;
     out.r += noiseBase * textureAmount;
     out.g += (noiseBase * 0.55f + noiseAlt * 0.45f) * textureAmount;
     out.b += noiseAlt * textureAmount;
 
-    if (temporal && (temporal->hasPrevious || temporal->hasNext)) {
+    if (analysis.hasTemporalAverage) {
         const float temporalMix = clamp01(controls.temporalAssist * correction * scores.temporal);
         if (temporalMix > 0.0f) {
-            Pixel temporalAverage{0.0f, 0.0f, 0.0f, input.a};
-            float count = 0.0f;
-            if (temporal->hasPrevious && temporal->previous) {
-                temporalAverage = add(temporalAverage, temporal->previous->sample(static_cast<float>(x), static_cast<float>(y)));
-                count += 1.0f;
-            }
-            if (temporal->hasNext && temporal->next) {
-                temporalAverage = add(temporalAverage, temporal->next->sample(static_cast<float>(x), static_cast<float>(y)));
-                count += 1.0f;
-            }
-            if (count > 0.0f) {
-                temporalAverage = mul(temporalAverage, 1.0f / count);
-                temporalAverage.a = input.a;
-                out = mix(out, temporalAverage, temporalMix * 0.35f);
-            }
+            out = mix(
+                out,
+                analysis.temporalAverage,
+                temporalMix * 0.35f);
         }
     }
     out.a = input.a;
@@ -427,8 +523,33 @@ Pixel FakeDiagnosticCore::processPixel(
     int viewMode,
     const TemporalContextT<SamplerT>* temporal)
 {
-    const Pixel input = sampler.sample(static_cast<float>(x), static_cast<float>(y));
-    const Scores scores = analyzePixel(sampler, x, y, frame, controls, temporal);
+    return processPixel(
+        sampler,
+        x,
+        y,
+        frame,
+        controls,
+        prepare(frame, controls),
+        viewMode,
+        temporal);
+}
+
+template <typename SamplerT>
+Pixel FakeDiagnosticCore::processPixel(
+    const SamplerT& sampler,
+    int x,
+    int y,
+    const FrameInfo& frame,
+    const Controls& controls,
+    const PreparedState& prepared,
+    int viewMode,
+    const TemporalContextT<SamplerT>* temporal)
+{
+    (void)frame;
+    const Analysis analysis =
+        analyzeContext(sampler, x, y, controls, prepared, temporal);
+    const Pixel input = analysis.input;
+    const Scores& scores = analysis.scores;
     const Pixel category = categoryColor(scores);
 
     if (viewMode == ViewProblemMatte) {
@@ -445,7 +566,7 @@ Pixel FakeDiagnosticCore::processPixel(
     }
 
     if (viewMode == ViewTemporalDifferenceOverlay) {
-        const float diff = temporalDifference(sampler, x, y, temporal);
+        const float diff = analysis.temporalDifference;
         const Pixel diffColor{0.0f, clamp01(diff * 4.0f), clamp01(1.0f - diff * 5.0f), input.a};
         const Pixel riskColor{0.0f, 1.0f, 0.22f, input.a};
         const Pixel color = mix(diffColor, riskColor, scores.temporal);
@@ -453,12 +574,12 @@ Pixel FakeDiagnosticCore::processPixel(
     }
 
     if (viewMode == ViewRealityMatchAssist) {
-        return applyAssist(sampler, x, y, frame, input, scores, controls, temporal);
+        return applyAssist(x, y, analysis, controls, prepared);
     }
 
     Pixel base = input;
     if (viewMode == ViewAssistWithOverlay) {
-        base = applyAssist(sampler, x, y, frame, input, scores, controls, temporal);
+        base = applyAssist(x, y, analysis, controls, prepared);
     }
 
     const Pixel overlayBase = mix(base, category, controls.overlayStrength * scores.overall);

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -6,10 +7,14 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <list>
+#include <memory>
+#include <mutex>
 #include <new>
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "CinematicToolsCore.h"
 #include "OfxRenderRuntime.h"
@@ -42,7 +47,7 @@ OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kSourceFrameRangeProp = "OfxImageClipPropFrameRange_Source";
 constexpr int kPluginMajorVersion = 2;
-constexpr int kPluginMinorVersion = 0;
+constexpr int kPluginMinorVersion = 1;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -384,22 +389,51 @@ public:
         data_.resize(static_cast<std::size_t>(width_) * height_ * 4u);
         constexpr std::size_t valuesPerPixel = 4u;
         constexpr std::size_t bytesPerPixel = valuesPerPixel * sizeof(std::uint16_t);
-        const std::size_t fullWidth = header.width;
-
-        for (int row = 0; row < height_; ++row) {
-            const std::size_t sourceY = static_cast<std::size_t>(y1_ - imageBounds.y1 + row);
-            const std::size_t sourceX = static_cast<std::size_t>(x1_ - imageBounds.x1);
-            const std::size_t pixelOffset = sourceY * fullWidth + sourceX;
-            const std::streamoff byteOffset =
-                static_cast<std::streamoff>(sizeof(RadianceCacheHeader) + pixelOffset * bytesPerPixel);
-            input.seekg(byteOffset, std::ios::beg);
-            auto* destination = data_.data() + static_cast<std::size_t>(row) * width_ * valuesPerPixel;
+        if (
+            x1_ == imageBounds.x1 &&
+            y1_ == imageBounds.y1 &&
+            x2_ == imageBounds.x2 &&
+            y2_ == imageBounds.y2) {
             input.read(
-                reinterpret_cast<char*>(destination),
-                static_cast<std::streamsize>(static_cast<std::size_t>(width_) * bytesPerPixel));
+                reinterpret_cast<char*>(data_.data()),
+                static_cast<std::streamsize>(
+                    static_cast<std::size_t>(width_) *
+                    static_cast<std::size_t>(height_) *
+                    bytesPerPixel));
             if (!input) {
                 data_.clear();
                 return false;
+            }
+        } else {
+            const std::size_t fullWidth = header.width;
+            for (int row = 0; row < height_; ++row) {
+                const std::size_t sourceY =
+                    static_cast<std::size_t>(
+                        y1_ - imageBounds.y1 + row);
+                const std::size_t sourceX =
+                    static_cast<std::size_t>(
+                        x1_ - imageBounds.x1);
+                const std::size_t pixelOffset =
+                    sourceY * fullWidth + sourceX;
+                const std::streamoff byteOffset =
+                    static_cast<std::streamoff>(
+                        sizeof(RadianceCacheHeader) +
+                        pixelOffset * bytesPerPixel);
+                input.seekg(byteOffset, std::ios::beg);
+                auto* destination =
+                    data_.data() +
+                    static_cast<std::size_t>(row) *
+                        width_ *
+                        valuesPerPixel;
+                input.read(
+                    reinterpret_cast<char*>(destination),
+                    static_cast<std::streamsize>(
+                        static_cast<std::size_t>(width_) *
+                        bytesPerPixel));
+                if (!input) {
+                    data_.clear();
+                    return false;
+                }
             }
         }
 
@@ -429,6 +463,11 @@ public:
         return valid_;
     }
 
+    std::size_t byteSize() const
+    {
+        return data_.size() * sizeof(std::uint16_t);
+    }
+
 private:
     bool valid_ = false;
     int x1_ = 0;
@@ -439,6 +478,216 @@ private:
     int height_ = 0;
     std::vector<std::uint16_t> data_;
 };
+
+std::filesystem::path radianceCachePath(
+    const std::string& directory,
+    std::int64_t frameIndex)
+{
+    std::ostringstream fileName;
+    fileName
+        << "frame_"
+        << std::setw(8)
+        << std::setfill('0')
+        << frameIndex
+        << ".bwrcache";
+    return std::filesystem::path(directory) / fileName.str();
+}
+
+class RadianceFrameStore {
+public:
+    std::shared_ptr<const RadianceCacheFrame> get(
+        const std::string& directory,
+        std::int64_t frameIndex,
+        const OfxRectI& imageBounds)
+    {
+        if (directory.empty()) {
+            return nullptr;
+        }
+
+        const auto path = radianceCachePath(directory, frameIndex);
+        std::error_code error;
+        const auto writeTime = std::filesystem::last_write_time(path, error);
+        if (error) {
+            return nullptr;
+        }
+        const auto fileSize = std::filesystem::file_size(path, error);
+        if (error) {
+            return nullptr;
+        }
+
+        const Key key{
+            path.string(),
+            writeTime.time_since_epoch().count(),
+            fileSize,
+            frameIndex,
+            imageBounds,
+        };
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto it = entries_.begin(); it != entries_.end(); ++it) {
+            if (it->key == key) {
+                auto frame = it->frame;
+                entries_.splice(entries_.begin(), entries_, it);
+                return frame;
+            }
+        }
+
+        auto frame = std::make_shared<RadianceCacheFrame>();
+        if (!frame->load(
+                directory,
+                frameIndex,
+                imageBounds,
+                imageBounds)) {
+            return nullptr;
+        }
+        const std::size_t bytes = frame->byteSize();
+        entries_.push_front(Entry{key, frame, bytes});
+        residentBytes_ += bytes;
+        while (
+            entries_.size() > kMaxFrames ||
+            (residentBytes_ > kMaxResidentBytes &&
+             entries_.size() > 1)) {
+            residentBytes_ -= entries_.back().bytes;
+            entries_.pop_back();
+        }
+        return frame;
+    }
+
+private:
+    struct Key {
+        std::string path;
+        std::filesystem::file_time_type::duration::rep writeTime;
+        std::uintmax_t fileSize;
+        std::int64_t frameIndex;
+        OfxRectI bounds;
+
+        bool operator==(const Key& other) const
+        {
+            return path == other.path &&
+                writeTime == other.writeTime &&
+                fileSize == other.fileSize &&
+                frameIndex == other.frameIndex &&
+                bounds.x1 == other.bounds.x1 &&
+                bounds.y1 == other.bounds.y1 &&
+                bounds.x2 == other.bounds.x2 &&
+                bounds.y2 == other.bounds.y2;
+        }
+    };
+
+    struct Entry {
+        Key key;
+        std::shared_ptr<const RadianceCacheFrame> frame;
+        std::size_t bytes;
+    };
+
+    static constexpr std::size_t kMaxFrames = 6;
+    static constexpr std::size_t kMaxResidentBytes =
+        512u * 1024u * 1024u;
+    std::mutex mutex_;
+    std::list<Entry> entries_;
+    std::size_t residentBytes_ = 0;
+};
+
+RadianceFrameStore& radianceFrameStore()
+{
+    static RadianceFrameStore store;
+    return store;
+}
+
+struct FrameDirectorPrepared {
+    buckswood_cinematic::FocusAnalysis focus;
+    buckswood_cinematic::CropWindow crop;
+};
+
+bool frameDirectorControlsEqual(
+    const buckswood_cinematic::FrameDirectorControls& left,
+    const buckswood_cinematic::FrameDirectorControls& right)
+{
+    return left.targetAspect == right.targetAspect &&
+        left.viewMode == right.viewMode &&
+        left.framingMode == right.framingMode &&
+        left.autoStrength == right.autoStrength &&
+        left.subjectWeight == right.subjectWeight &&
+        left.skinWeight == right.skinWeight &&
+        left.subjectLock == right.subjectLock &&
+        left.lockX == right.lockX &&
+        left.lockY == right.lockY &&
+        left.cutSensitivity == right.cutSensitivity &&
+        left.temporalSmoothing == right.temporalSmoothing &&
+        left.motionLimit == right.motionLimit &&
+        left.manualX == right.manualX &&
+        left.manualY == right.manualY &&
+        left.subjectVerticalPosition == right.subjectVerticalPosition &&
+        left.guideOpacity == right.guideOpacity &&
+        left.matteOpacity == right.matteOpacity &&
+        left.cropFeather == right.cropFeather &&
+        left.outputMix == right.outputMix;
+}
+
+struct FrameDirectorCacheKey {
+    OfxImageEffectHandle instance = nullptr;
+    const void* sourceData = nullptr;
+    std::array<const void*, 4> temporalData{};
+    buckswood_cinematic::FrameDirectorControls controls{};
+    std::uint64_t timeBits = 0;
+    int width = 0;
+    int height = 0;
+    int rowBytes = 0;
+    int depthCode = 0;
+
+    bool operator==(const FrameDirectorCacheKey& other) const
+    {
+        return instance == other.instance &&
+            sourceData == other.sourceData &&
+            temporalData == other.temporalData &&
+            frameDirectorControlsEqual(controls, other.controls) &&
+            timeBits == other.timeBits &&
+            width == other.width &&
+            height == other.height &&
+            rowBytes == other.rowBytes &&
+            depthCode == other.depthCode;
+    }
+};
+
+class FrameDirectorStore {
+public:
+    template <typename Builder>
+    std::shared_ptr<const FrameDirectorPrepared> getOrCreate(
+        const FrameDirectorCacheKey& key,
+        Builder&& builder)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto it = entries_.begin(); it != entries_.end(); ++it) {
+            if (it->key == key) {
+                auto value = it->value;
+                entries_.splice(entries_.begin(), entries_, it);
+                return value;
+            }
+        }
+        auto value =
+            std::make_shared<const FrameDirectorPrepared>(builder());
+        entries_.push_front(Entry{key, value});
+        while (entries_.size() > kCapacity) {
+            entries_.pop_back();
+        }
+        return value;
+    }
+
+private:
+    struct Entry {
+        FrameDirectorCacheKey key;
+        std::shared_ptr<const FrameDirectorPrepared> value;
+    };
+
+    static constexpr std::size_t kCapacity = 16;
+    std::mutex mutex_;
+    std::list<Entry> entries_;
+};
+
+FrameDirectorStore& frameDirectorStore()
+{
+    static FrameDirectorStore store;
+    return store;
+}
 
 buckswood_cinematic::Pixel mixPixels(
     buckswood_cinematic::Pixel a,
@@ -545,47 +794,130 @@ OfxStatus renderTyped(
     auto temporalControls = buckswood_cinematic::CinematicToolsCore::defaultTemporalIntegrityControls();
     buckswood_cinematic::FocusAnalysis focus{0.5f, 0.46f, 0.0f};
     buckswood_cinematic::CropWindow crop{0.0f, 0.0f, static_cast<float>(frame.width), static_cast<float>(frame.height)};
-    RadianceCacheFrame radianceCache;
+    auto framePrepared =
+        buckswood_cinematic::CinematicToolsCore::prepareFrameDirector(
+            frame,
+            frameControls,
+            crop);
+    auto radiancePrepared =
+        buckswood_cinematic::CinematicToolsCore::prepareRadiance(
+            radianceControls);
+    auto temporalPrepared =
+        buckswood_cinematic::CinematicToolsCore::
+            prepareTemporalIntegrity(temporalControls);
+    std::shared_ptr<const RadianceCacheFrame> radianceCache;
     float mlCacheBlend = 0.85f;
     float mlConfidenceThreshold = 0.20f;
 
     if (kind == PluginFrameDirector) {
         frameControls = frameControlsAtTime(instance, time);
-        const auto currentFocus = buckswood_cinematic::CinematicToolsCore::analyzeFocus(sampler, frame, frameControls);
-        buckswood_cinematic::FocusAnalysis previous2Focus;
-        buckswood_cinematic::FocusAnalysis previousFocus;
-        buckswood_cinematic::FocusAnalysis nextFocus;
-        buckswood_cinematic::FocusAnalysis next2Focus;
-        const buckswood_cinematic::FocusAnalysis* previous2FocusPtr = nullptr;
-        const buckswood_cinematic::FocusAnalysis* previousFocusPtr = nullptr;
-        const buckswood_cinematic::FocusAnalysis* nextFocusPtr = nullptr;
-        const buckswood_cinematic::FocusAnalysis* next2FocusPtr = nullptr;
-        if (previous2) {
-            previous2Focus = buckswood_cinematic::CinematicToolsCore::analyzeFocus(previous2Sampler, frame, frameControls);
-            previous2FocusPtr = &previous2Focus;
-        }
-        if (previous) {
-            previousFocus = buckswood_cinematic::CinematicToolsCore::analyzeFocus(previousSampler, frame, frameControls);
-            previousFocusPtr = &previousFocus;
-        }
-        if (next) {
-            nextFocus = buckswood_cinematic::CinematicToolsCore::analyzeFocus(nextSampler, frame, frameControls);
-            nextFocusPtr = &nextFocus;
-        }
-        if (next2) {
-            next2Focus = buckswood_cinematic::CinematicToolsCore::analyzeFocus(next2Sampler, frame, frameControls);
-            next2FocusPtr = &next2Focus;
-        }
-        focus = buckswood_cinematic::CinematicToolsCore::smoothFocus(
-            currentFocus,
-            previous2FocusPtr,
-            previousFocusPtr,
-            nextFocusPtr,
-            next2FocusPtr,
-            frameControls);
-        crop = buckswood_cinematic::CinematicToolsCore::cropWindow(frame, frameControls, focus);
+        FrameDirectorCacheKey key;
+        key.instance = instance;
+        key.sourceData = source.data;
+        key.temporalData = {
+            previous2 ? previous2->data : nullptr,
+            previous ? previous->data : nullptr,
+            next ? next->data : nullptr,
+            next2 ? next2->data : nullptr,
+        };
+        key.controls = frameControls;
+        std::memcpy(&key.timeBits, &time, sizeof(time));
+        key.width = frame.width;
+        key.height = frame.height;
+        key.rowBytes = source.rowBytes;
+        key.depthCode =
+            source.pixelDepth &&
+                std::strcmp(source.pixelDepth, kOfxBitDepthFloat) == 0
+            ? 1
+            : 2;
+        const auto prepared = frameDirectorStore().getOrCreate(
+            key,
+            [&]() {
+                FrameDirectorPrepared value;
+                const auto currentFocus =
+                    buckswood_cinematic::CinematicToolsCore::
+                        analyzeFocus(
+                            sampler,
+                            frame,
+                            frameControls);
+                buckswood_cinematic::FocusAnalysis previous2Focus;
+                buckswood_cinematic::FocusAnalysis previousFocus;
+                buckswood_cinematic::FocusAnalysis nextFocus;
+                buckswood_cinematic::FocusAnalysis next2Focus;
+                const buckswood_cinematic::FocusAnalysis*
+                    previous2FocusPtr = nullptr;
+                const buckswood_cinematic::FocusAnalysis*
+                    previousFocusPtr = nullptr;
+                const buckswood_cinematic::FocusAnalysis*
+                    nextFocusPtr = nullptr;
+                const buckswood_cinematic::FocusAnalysis*
+                    next2FocusPtr = nullptr;
+                if (previous2) {
+                    previous2Focus =
+                        buckswood_cinematic::CinematicToolsCore::
+                            analyzeFocus(
+                                previous2Sampler,
+                                frame,
+                                frameControls);
+                    previous2FocusPtr = &previous2Focus;
+                }
+                if (previous) {
+                    previousFocus =
+                        buckswood_cinematic::CinematicToolsCore::
+                            analyzeFocus(
+                                previousSampler,
+                                frame,
+                                frameControls);
+                    previousFocusPtr = &previousFocus;
+                }
+                if (next) {
+                    nextFocus =
+                        buckswood_cinematic::CinematicToolsCore::
+                            analyzeFocus(
+                                nextSampler,
+                                frame,
+                                frameControls);
+                    nextFocusPtr = &nextFocus;
+                }
+                if (next2) {
+                    next2Focus =
+                        buckswood_cinematic::CinematicToolsCore::
+                            analyzeFocus(
+                                next2Sampler,
+                                frame,
+                                frameControls);
+                    next2FocusPtr = &next2Focus;
+                }
+                value.focus =
+                    buckswood_cinematic::CinematicToolsCore::
+                        smoothFocus(
+                            currentFocus,
+                            previous2FocusPtr,
+                            previousFocusPtr,
+                            nextFocusPtr,
+                            next2FocusPtr,
+                            frameControls);
+                value.crop =
+                    buckswood_cinematic::CinematicToolsCore::
+                        cropWindow(
+                            frame,
+                            frameControls,
+                            value.focus);
+                return value;
+            });
+        focus = prepared->focus;
+        crop = prepared->crop;
+        framePrepared =
+            buckswood_cinematic::CinematicToolsCore::
+                prepareFrameDirector(
+                    frame,
+                    frameControls,
+                    crop);
     } else if (kind == PluginRadianceRecover) {
         radianceControls = radianceControlsAtTime(instance, time);
+        radiancePrepared =
+            buckswood_cinematic::CinematicToolsCore::
+                prepareRadiance(radianceControls);
         const bool useMLCache = intParamAtTime(instance, "useMLCache", time, 0) != 0;
         mlCacheBlend = static_cast<float>(doubleParamAtTime(instance, "mlCacheBlend", time, 0.85));
         mlConfidenceThreshold = static_cast<float>(doubleParamAtTime(instance, "mlConfidenceThreshold", time, 0.20));
@@ -593,14 +925,16 @@ OfxStatus renderTyped(
             doubleParamAtTime(instance, "cacheFrameOffset", time, 0.0)));
         const std::string cacheDirectory = stringParamAtTime(instance, "cacheDirectory", time, "");
         if (useMLCache) {
-            radianceCache.load(
+            radianceCache = radianceFrameStore().get(
                 cacheDirectory,
                 static_cast<std::int64_t>(std::llround(time)) + cacheFrameOffset,
-                destination.bounds,
-                renderWindow);
+                destination.bounds);
         }
     } else {
         temporalControls = temporalControlsAtTime(instance, time);
+        temporalPrepared =
+            buckswood_cinematic::CinematicToolsCore::
+                prepareTemporalIntegrity(temporalControls);
     }
 
     auto renderRows = [&](int firstY, int lastY) {
@@ -628,7 +962,8 @@ OfxStatus renderTyped(
                         frame,
                         frameControls,
                         focus,
-                        crop);
+                        crop,
+                        framePrepared);
                 } else if (kind == PluginRadianceRecover) {
                     auto nativeControls = radianceControls;
                     if (nativeControls.viewMode == buckswood_cinematic::RadianceMLConfidence ||
@@ -641,10 +976,17 @@ OfxStatus renderTyped(
                         y,
                         frame,
                         nativeControls,
+                        radiancePrepared,
                         &temporal);
                     buckswood_cinematic::Pixel cached;
                     float confidence = 0.0f;
-                    const bool hasCachedPixel = radianceCache.sample(x, y, cached, confidence);
+                    const bool hasCachedPixel =
+                        radianceCache &&
+                        radianceCache->sample(
+                            x,
+                            y,
+                            cached,
+                            confidence);
                     cached.a = sampler.sample(static_cast<float>(x), static_cast<float>(y)).a;
                     if (radianceControls.viewMode == buckswood_cinematic::RadianceMLConfidence) {
                         output = buckswood_cinematic::Pixel{
@@ -675,6 +1017,7 @@ OfxStatus renderTyped(
                         y,
                         frame,
                         temporalControls,
+                        temporalPrepared,
                         &temporal);
                 }
                 writePixel(destinationPixel, output);
@@ -1017,11 +1360,11 @@ const char* pluginLabel(PluginKind kind)
 {
     switch (kind) {
     case PluginFrameDirector:
-        return "Buckswood Frame Director v2.0";
+        return "Buckswood Frame Director v2.1";
     case PluginRadianceRecover:
-        return "Buckswood Radiance Recover v2.0";
+        return "Buckswood Radiance Recover v2.1";
     default:
-        return "Buckswood Temporal Integrity v2.0";
+        return "Buckswood Temporal Integrity v2.1";
     }
 }
 

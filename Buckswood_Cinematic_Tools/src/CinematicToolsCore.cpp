@@ -422,9 +422,62 @@ Pixel CinematicToolsCore::processFrameDirector(
     const FocusAnalysis& focus,
     const CropWindow& crop)
 {
+    return processFrameDirector(
+        sampler,
+        x,
+        y,
+        frame,
+        controls,
+        focus,
+        crop,
+        prepareFrameDirector(frame, controls, crop));
+}
+
+CinematicToolsCore::FrameDirectorState
+CinematicToolsCore::prepareFrameDirector(
+    const FrameInfo& frame,
+    const FrameDirectorControls& controls,
+    const CropWindow& crop)
+{
+    const float cropWidth = std::max(1.0f, crop.x2 - crop.x1);
+    const float cropHeight = std::max(1.0f, crop.y2 - crop.y1);
+    return FrameDirectorState{
+        1.0f /
+            std::max(
+                1.0f,
+                static_cast<float>(frame.width - 1)),
+        1.0f /
+            std::max(
+                1.0f,
+                static_cast<float>(frame.height - 1)),
+        std::max(
+            1.0f,
+            controls.cropFeather *
+                std::min(frame.width, frame.height)),
+        cropWidth,
+        cropHeight,
+        1.0f / cropWidth,
+        1.0f / cropHeight,
+        1.5f /
+            std::max(
+                120.0f,
+                std::min(cropWidth, cropHeight)),
+    };
+}
+
+Pixel CinematicToolsCore::processFrameDirector(
+    const Sampler& sampler,
+    int x,
+    int y,
+    const FrameInfo& frame,
+    const FrameDirectorControls& controls,
+    const FocusAnalysis& focus,
+    const CropWindow& crop,
+    const FrameDirectorState& prepared)
+{
     const Pixel input = sampler.sample(static_cast<float>(x), static_cast<float>(y));
-    const float nx = static_cast<float>(x) / std::max(1.0f, static_cast<float>(frame.width - 1));
-    const float ny = static_cast<float>(y) / std::max(1.0f, static_cast<float>(frame.height - 1));
+    const float nx = static_cast<float>(x) * prepared.inverseWidth;
+    const float ny = static_cast<float>(y) * prepared.inverseHeight;
 
     if (controls.viewMode == FrameDirectorSaliency) {
         const float saliency = clamp01(saliencyAt(sampler, static_cast<float>(x), static_cast<float>(y), frame, controls) * 2.2f);
@@ -446,13 +499,12 @@ Pixel CinematicToolsCore::processFrameDirector(
         };
     }
 
-    const float featherPixels = std::max(1.0f, controls.cropFeather * std::min(frame.width, frame.height));
     const float insideX =
-        smoothstep(crop.x1 - featherPixels, crop.x1 + featherPixels, static_cast<float>(x)) *
-        (1.0f - smoothstep(crop.x2 - featherPixels, crop.x2 + featherPixels, static_cast<float>(x)));
+        smoothstep(crop.x1 - prepared.featherPixels, crop.x1 + prepared.featherPixels, static_cast<float>(x)) *
+        (1.0f - smoothstep(crop.x2 - prepared.featherPixels, crop.x2 + prepared.featherPixels, static_cast<float>(x)));
     const float insideY =
-        smoothstep(crop.y1 - featherPixels, crop.y1 + featherPixels, static_cast<float>(y)) *
-        (1.0f - smoothstep(crop.y2 - featherPixels, crop.y2 + featherPixels, static_cast<float>(y)));
+        smoothstep(crop.y1 - prepared.featherPixels, crop.y1 + prepared.featherPixels, static_cast<float>(y)) *
+        (1.0f - smoothstep(crop.y2 - prepared.featherPixels, crop.y2 + prepared.featherPixels, static_cast<float>(y)));
     const float inside = clamp01(insideX * insideY);
 
     if (controls.viewMode == FrameDirectorCropMask) {
@@ -465,16 +517,17 @@ Pixel CinematicToolsCore::processFrameDirector(
     }
     result = input;
 
-    const float cropWidth = std::max(1.0f, crop.x2 - crop.x1);
-    const float cropHeight = std::max(1.0f, crop.y2 - crop.y1);
-    const float localX = (static_cast<float>(x) - crop.x1) / cropWidth;
-    const float localY = (static_cast<float>(y) - crop.y1) / cropHeight;
-    const float thickness = 1.5f / std::max(120.0f, std::min(cropWidth, cropHeight));
+    const float localX =
+        (static_cast<float>(x) - crop.x1) *
+        prepared.inverseCropWidth;
+    const float localY =
+        (static_cast<float>(y) - crop.y1) *
+        prepared.inverseCropHeight;
     float guide = 0.0f;
-    guide = std::max(guide, guideLine(localX, 1.0f / 3.0f, thickness));
-    guide = std::max(guide, guideLine(localX, 2.0f / 3.0f, thickness));
-    guide = std::max(guide, guideLine(localY, 1.0f / 3.0f, thickness));
-    guide = std::max(guide, guideLine(localY, 2.0f / 3.0f, thickness));
+    guide = std::max(guide, guideLine(localX, 1.0f / 3.0f, prepared.guideThickness));
+    guide = std::max(guide, guideLine(localX, 2.0f / 3.0f, prepared.guideThickness));
+    guide = std::max(guide, guideLine(localY, 1.0f / 3.0f, prepared.guideThickness));
+    guide = std::max(guide, guideLine(localY, 2.0f / 3.0f, prepared.guideThickness));
     const float cropBorder =
         std::max(
             std::max(guideLine(static_cast<float>(x), crop.x1, 1.0f), guideLine(static_cast<float>(x), crop.x2, 1.0f)),
@@ -495,6 +548,42 @@ Pixel CinematicToolsCore::processRadiance(
     const RadianceControls& controls,
     const TemporalContext* temporal)
 {
+    return processRadiance(
+        sampler,
+        x,
+        y,
+        frame,
+        controls,
+        prepareRadiance(controls),
+        temporal);
+}
+
+CinematicToolsCore::RadianceState
+CinematicToolsCore::prepareRadiance(
+    const RadianceControls& controls)
+{
+    const float headroom =
+        std::max(
+            0.0f,
+            std::pow(
+                2.0f,
+                controls.recoveredHeadroomStops) -
+                1.0f);
+    return RadianceState{
+        headroom,
+        1.0f + headroom * 0.35f,
+    };
+}
+
+Pixel CinematicToolsCore::processRadiance(
+    const Sampler& sampler,
+    int x,
+    int y,
+    const FrameInfo& frame,
+    const RadianceControls& controls,
+    const RadianceState& prepared,
+    const TemporalContext* temporal)
+{
     const Pixel input = sampler.sample(static_cast<float>(x), static_cast<float>(y));
     const Pixel blur = crossBlur(sampler, x, y, 2.0f);
     const float y0 = std::max(0.0f, luma(input));
@@ -505,22 +594,20 @@ Pixel CinematicToolsCore::processRadiance(
         clipMask *
         smoothstep(0.02f, 0.24f, maxChannel(input) - minChannel(input) + std::fabs(y0 - blurY));
     const float shadowMask = 1.0f - smoothstep(0.025f, 0.24f, y0);
-    const float headroom = std::max(0.0f, std::pow(2.0f, controls.recoveredHeadroomStops) - 1.0f);
     const float normalizedHighlight = clamp01((y0 - 0.68f) / 0.32f);
 
     float recoveredY =
         y0 +
-        controls.highlightRecovery * highlightMask * normalizedHighlight * normalizedHighlight * headroom * 0.24f;
+        controls.highlightRecovery * highlightMask * normalizedHighlight * normalizedHighlight * prepared.headroom * 0.24f;
     recoveredY += (y0 - blurY) * controls.localDetail * highlightMask * 1.6f;
     recoveredY +=
         specularMask *
         controls.specularRecovery *
-        headroom *
+        prepared.headroom *
         0.10f;
-    const float softLimit = 1.0f + headroom * 0.35f;
-    if (recoveredY > softLimit) {
-        const float excess = recoveredY - softLimit;
-        recoveredY = softLimit + excess / (1.0f + excess * (1.0f + controls.highlightRolloff * 3.0f));
+    if (recoveredY > prepared.softLimit) {
+        const float excess = recoveredY - prepared.softLimit;
+        recoveredY = prepared.softLimit + excess / (1.0f + excess * (1.0f + controls.highlightRolloff * 3.0f));
     }
 
     const float denoisedY = y0 + (blurY - y0) * clamp01(controls.shadowDenoise * shadowMask);
@@ -607,6 +694,41 @@ Pixel CinematicToolsCore::processTemporalIntegrity(
     const TemporalIntegrityControls& controls,
     const TemporalContext* temporal)
 {
+    return processTemporalIntegrity(
+        sampler,
+        x,
+        y,
+        frame,
+        controls,
+        prepareTemporalIntegrity(controls),
+        temporal);
+}
+
+CinematicToolsCore::TemporalIntegrityState
+CinematicToolsCore::prepareTemporalIntegrity(
+    const TemporalIntegrityControls& controls)
+{
+    const float sensitivity =
+        std::max(0.1f, controls.sensitivity);
+    return TemporalIntegrityState{
+        0.018f / sensitivity,
+        0.16f / sensitivity,
+        0.012f / sensitivity,
+        0.13f / sensitivity,
+        clamp01(controls.motionGuard),
+        clamp01(controls.edgeProtection),
+    };
+}
+
+Pixel CinematicToolsCore::processTemporalIntegrity(
+    const Sampler& sampler,
+    int x,
+    int y,
+    const FrameInfo& frame,
+    const TemporalIntegrityControls& controls,
+    const TemporalIntegrityState& prepared,
+    const TemporalContext* temporal)
+{
     (void)frame;
     const Pixel input = sampler.sample(static_cast<float>(x), static_cast<float>(y));
     if (!temporal || (!temporal->hasPrevious && !temporal->hasNext)) {
@@ -635,9 +757,8 @@ Pixel CinematicToolsCore::processTemporalIntegrity(
     const Pixel neighborAverage = mul(add(previous, next), 0.5f);
     const float neighborDifference = pixelDistance(previous, next);
     const float currentOutlier = pixelDistance(input, neighborAverage);
-    const float sensitivity = std::max(0.1f, controls.sensitivity);
-    const float agreement = 1.0f - smoothstep(0.018f / sensitivity, 0.16f / sensitivity, neighborDifference);
-    const float outlier = smoothstep(0.012f / sensitivity, 0.13f / sensitivity, currentOutlier);
+    const float agreement = 1.0f - smoothstep(prepared.agreementLow, prepared.agreementHigh, neighborDifference);
+    const float outlier = smoothstep(prepared.outlierLow, prepared.outlierHigh, currentOutlier);
     const float motion = smoothstep(0.025f, 0.24f, neighborDifference);
     const float farDifference = pixelDistance(previous2, next2);
     const float longTermAgreement = 1.0f - smoothstep(0.025f, 0.22f, farDifference);
@@ -645,8 +766,8 @@ Pixel CinematicToolsCore::processTemporalIntegrity(
         smoothstep(0.04f, 0.28f, std::max(neighborDifference, farDifference)) *
         smoothstep(0.015f, 0.16f, pixelDistance(temporalMedian, input));
     const float edge = smoothstep(0.025f, 0.24f, localEdge(sampler, x, y));
-    const float motionProtection = 1.0f - motion * clamp01(controls.motionGuard);
-    const float edgeProtection = 1.0f - edge * clamp01(controls.edgeProtection);
+    const float motionProtection = 1.0f - motion * prepared.motionGuard;
+    const float edgeProtection = 1.0f - edge * prepared.edgeProtection;
 
     const float previousY = luma(previous);
     const float currentY = luma(input);

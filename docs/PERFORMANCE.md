@@ -13,6 +13,11 @@ The other Resolve OFX plugins use Resolve's `OfxMultiThreadSuiteV1` worker
 pool. This avoids creating a new set of operating-system threads for every
 node and frame, and lets Resolve coordinate concurrent clips and nodes.
 
+As of suite v2.4.0, the CPU-heavy plugins also move frame-constant work out of
+their pixel loops. Fake Diagnostic, Film Emulation, Frame Director, Radiance
+Recover, and Temporal Integrity build immutable prepared state once per
+render. The same prepared-state API is used by the Premiere native plugins.
+
 ## Quality contract
 
 The performance paths do not use FP16, reduced sample counts, lower-resolution
@@ -58,10 +63,23 @@ program and kernels are compiled once per OpenCL context and reused. Lens
 models and frame-constant parameters are prepared once per render instead of
 once per pixel.
 
-The plugins deliberately do not keep a second full-frame image cache. Resolve
-already owns render caching, and an internal frame cache would duplicate large
-Float32 buffers, complicate invalidation for keyframes and upstream node
-changes, and risk stale frames.
+Lens Physics and AI Photorealizer deliberately do not keep a second full-frame
+image cache because Resolve already owns those image buffers.
+
+Look DNA and Frame Director do keep small, bounded analysis caches. They store
+profiles, match contexts, focus points, and crop windows, not duplicate Float32
+source frames. This prevents expensive analysis from repeating when Resolve
+requests the same frame in multiple render tiles.
+
+Radiance Recover keeps up to six validated ML cache frames with a 512 MB
+process-wide limit. File modification time and size are part of the cache key,
+so regenerated companion-cache frames are reloaded.
+
+Run the CPU prepared-state parity benchmark locally:
+
+```bash
+bash scripts/run_all_plugin_cpu_benchmark.sh
+```
 
 ## Platform validation
 

@@ -31,7 +31,7 @@ OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.fake.diagnostic";
 constexpr int kPluginMajorVersion = 2;
-constexpr int kPluginMinorVersion = 1;
+constexpr int kPluginMinorVersion = 2;
 constexpr const char* kSourceFrameRangeProp = "OfxImageClipPropFrameRange_Source";
 
 struct ImageInfo {
@@ -312,6 +312,8 @@ OfxStatus renderTyped(
         previousInfo != nullptr,
         nextInfo != nullptr,
     };
+    const buckswood_fake::FakeDiagnosticCore::PreparedState prepared =
+        buckswood_fake::FakeDiagnosticCore::prepare(frame, controls);
     auto* dst = reinterpret_cast<DstPixel*>(dstInfo.data);
 
     auto renderRows = [&](int yBegin, int yEnd) {
@@ -329,6 +331,7 @@ OfxStatus renderTyped(
                         y,
                         frame,
                         controls,
+                        prepared,
                         viewMode,
                         &temporal);
                     if constexpr (std::is_same<DstPixel, OfxRGBAColourF>::value) {
@@ -617,7 +620,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
     gPropHost->propSetInt(effectProps, kOfxImageEffectPropTemporalClipAccess, 0, 1);
-    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood Fake Diagnostic v2.1");
+    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood Fake Diagnostic v2.2");
     gPropHost->propSetString(effectProps, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
     return kOfxStatOK;

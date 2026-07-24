@@ -1,10 +1,15 @@
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <cstring>
 #include <exception>
+#include <list>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "LookDNACore.h"
 #include "OfxRenderRuntime.h"
@@ -34,7 +39,7 @@ OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 constexpr const char* kPluginIdentifier = "com.buckswood.look.dna";
 constexpr const char* kSourceFrameRangeProp = "OfxImageClipPropFrameRange_Source";
 constexpr int kPluginMajorVersion = 2;
-constexpr int kPluginMinorVersion = 1;
+constexpr int kPluginMinorVersion = 2;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -383,6 +388,155 @@ private:
     OfxRGBAColourB* base_;
 };
 
+struct LookPreparedRender {
+    buckswood_lookdna::MatchContext globalMatch;
+    int spatialLookupWidth = 0;
+    int spatialLookupHeight = 0;
+    std::vector<buckswood_lookdna::MatchContext> spatialLookup;
+};
+
+bool lookControlsEqual(
+    const buckswood_lookdna::Controls& left,
+    const buckswood_lookdna::Controls& right)
+{
+    return left.enabled == right.enabled &&
+        left.inputSpace == right.inputSpace &&
+        left.referenceSpace == right.referenceSpace &&
+        left.matchMode == right.matchMode &&
+        left.analysisQuality == right.analysisQuality &&
+        left.viewMode == right.viewMode &&
+        left.temporalRadius == right.temporalRadius &&
+        left.referenceBMix == right.referenceBMix &&
+        left.referenceCMix == right.referenceCMix &&
+        left.referenceAdaptivity == right.referenceAdaptivity &&
+        left.matchStrength == right.matchStrength &&
+        left.toneMatch == right.toneMatch &&
+        left.paletteMatch == right.paletteMatch &&
+        left.semanticMatch == right.semanticMatch &&
+        left.localContrastMatch == right.localContrastMatch &&
+        left.textureMatch == right.textureMatch &&
+        left.grainMatch == right.grainMatch &&
+        left.densityMatch == right.densityMatch &&
+        left.exposureLock == right.exposureLock &&
+        left.skinProtect == right.skinProtect &&
+        left.highlightProtect == right.highlightProtect &&
+        left.sceneIdentityGuard == right.sceneIdentityGuard &&
+        left.temporalStability == right.temporalStability &&
+        left.spatialMatch == right.spatialMatch &&
+        left.shadowMatch == right.shadowMatch &&
+        left.midtoneMatch == right.midtoneMatch &&
+        left.highlightMatch == right.highlightMatch &&
+        left.gamutGuard == right.gamutGuard &&
+        left.splitPosition == right.splitPosition &&
+        left.outputMix == right.outputMix;
+}
+
+struct LookCacheKey {
+    OfxImageEffectHandle instance = nullptr;
+    const void* sourceData = nullptr;
+    std::array<const void*, 4> temporalData{};
+    std::array<const void*, 3> referenceData{};
+    buckswood_lookdna::Controls controls{};
+    std::uint64_t timeBits = 0;
+    OfxRectI bounds{0, 0, 0, 0};
+    int rowBytes = 0;
+    int depthCode = 0;
+
+    bool operator==(const LookCacheKey& other) const
+    {
+        return instance == other.instance &&
+            sourceData == other.sourceData &&
+            temporalData == other.temporalData &&
+            referenceData == other.referenceData &&
+            lookControlsEqual(controls, other.controls) &&
+            timeBits == other.timeBits &&
+            bounds.x1 == other.bounds.x1 &&
+            bounds.y1 == other.bounds.y1 &&
+            bounds.x2 == other.bounds.x2 &&
+            bounds.y2 == other.bounds.y2 &&
+            rowBytes == other.rowBytes &&
+            depthCode == other.depthCode;
+    }
+};
+
+LookCacheKey makeLookCacheKey(
+    OfxImageEffectHandle instance,
+    OfxTime time,
+    const ImageInfo& source,
+    const ImageInfo* previous2,
+    const ImageInfo* previous1,
+    const ImageInfo* next1,
+    const ImageInfo* next2,
+    const buckswood_lookdna::Controls& controls,
+    const std::array<std::shared_ptr<const buckswood_lookdna::ReferenceAsset>, 3>& references)
+{
+    LookCacheKey key;
+    key.instance = instance;
+    key.sourceData = source.data;
+    key.temporalData = {
+        previous2 ? previous2->data : nullptr,
+        previous1 ? previous1->data : nullptr,
+        next1 ? next1->data : nullptr,
+        next2 ? next2->data : nullptr,
+    };
+    key.referenceData = {
+        references[0].get(),
+        references[1].get(),
+        references[2].get(),
+    };
+    key.controls = controls;
+    std::memcpy(&key.timeBits, &time, sizeof(time));
+    key.bounds = source.bounds;
+    key.rowBytes = source.rowBytes;
+    key.depthCode =
+        source.pixelDepth &&
+            std::strcmp(source.pixelDepth, kOfxBitDepthFloat) == 0
+        ? 1
+        : 2;
+    return key;
+}
+
+class LookPreparedCache {
+public:
+    template <typename Builder>
+    std::shared_ptr<const LookPreparedRender> getOrCreate(
+        const LookCacheKey& key,
+        Builder&& builder)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto it = entries_.begin(); it != entries_.end(); ++it) {
+            if (it->key == key) {
+                auto value = it->value;
+                entries_.splice(entries_.begin(), entries_, it);
+                return value;
+            }
+        }
+
+        auto value = std::make_shared<const LookPreparedRender>(builder());
+        entries_.push_front(Entry{key, value});
+        while (entries_.size() > kCapacity) {
+            entries_.pop_back();
+        }
+        return value;
+    }
+
+private:
+    struct Entry {
+        LookCacheKey key;
+        std::shared_ptr<const LookPreparedRender> value;
+    };
+
+    static constexpr std::size_t kCapacity = 12;
+    std::mutex mutex_;
+    std::list<Entry> entries_;
+};
+
+LookPreparedCache& lookPreparedCache()
+{
+    static LookPreparedCache cache;
+    return cache;
+}
+
 template <typename DstPixel, typename SamplerType>
 OfxStatus renderTyped(
     OfxImageEffectHandle instance,
@@ -398,108 +552,215 @@ OfxStatus renderTyped(
     const std::array<std::shared_ptr<const buckswood_lookdna::ReferenceAsset>, 3>& references)
 {
     const SamplerType sampler(source);
-    const auto currentProfile = buckswood_lookdna::LookDNACore::analyze(
-        sampler,
-        controls.inputSpace,
-        controls.analysisQuality);
-
-    auto analyzeNeighbor = [&](const ImageInfo* info, buckswood_lookdna::LookProfile& profile)
-        -> const buckswood_lookdna::LookProfile* {
-        if (!info || controls.temporalStability <= 0.0001f) {
-            return static_cast<const buckswood_lookdna::LookProfile*>(nullptr);
-        }
-        const SamplerType neighborSampler(*info);
-        profile = buckswood_lookdna::LookDNACore::analyze(
-            neighborSampler,
-            controls.inputSpace,
-            controls.analysisQuality);
-        return profile.valid ? &profile : nullptr;
+    const buckswood_lookdna::FrameInfo frame{
+        source.bounds.x2 - source.bounds.x1,
+        source.bounds.y2 - source.bounds.y1,
+        static_cast<int>(time),
     };
-    buckswood_lookdna::LookProfile previous2Profile;
-    buckswood_lookdna::LookProfile previous1Profile;
-    buckswood_lookdna::LookProfile next1Profile;
-    buckswood_lookdna::LookProfile next2Profile;
-    const auto* previous2ProfilePtr = analyzeNeighbor(previous2, previous2Profile);
-    const auto* previous1ProfilePtr = analyzeNeighbor(previous1, previous1Profile);
-    const auto* next1ProfilePtr = analyzeNeighbor(next1, next1Profile);
-    const auto* next2ProfilePtr = analyzeNeighbor(next2, next2Profile);
-    float temporalConfidence = 1.0f;
-    const auto stableProfile = buckswood_lookdna::LookDNACore::stabilizeProfile5(
-        currentProfile,
-        previous2ProfilePtr,
-        previous1ProfilePtr,
-        next1ProfilePtr,
-        next2ProfilePtr,
-        controls.temporalStability,
-        &temporalConfidence);
+    const LookCacheKey cacheKey = makeLookCacheKey(
+        instance,
+        time,
+        source,
+        previous2,
+        previous1,
+        next1,
+        next2,
+        controls,
+        references);
+    const auto prepared = lookPreparedCache().getOrCreate(
+        cacheKey,
+        [&]() {
+            LookPreparedRender result;
+            const auto currentProfile =
+                buckswood_lookdna::LookDNACore::analyze(
+                    sampler,
+                    controls.inputSpace,
+                    controls.analysisQuality);
 
-    const std::array<const buckswood_lookdna::LookProfile*, 3> referenceProfiles{
-        references[0] && references[0]->valid() ? &references[0]->profile : nullptr,
-        references[1] && references[1]->valid() ? &references[1]->profile : nullptr,
-        references[2] && references[2]->valid() ? &references[2]->profile : nullptr,
-    };
-    const std::array<float, 3> requestedReferenceWeights{
-        1.0f,
-        controls.referenceBMix,
-        controls.referenceCMix,
-    };
-    std::array<float, 3> normalizedReferenceWeights{};
-    const auto blendedReference = buckswood_lookdna::LookDNACore::blendReferenceProfiles(
-        stableProfile,
-        referenceProfiles,
-        requestedReferenceWeights,
-        controls.referenceAdaptivity,
-        &normalizedReferenceWeights);
-    auto globalMatch = buckswood_lookdna::LookDNACore::buildMatch(
-        stableProfile,
-        blendedReference,
-        controls);
-    globalMatch.referenceWeights = normalizedReferenceWeights;
-    globalMatch.temporalConfidence = temporalConfidence;
-
-    std::array<buckswood_lookdna::MatchContext, buckswood_lookdna::SpatialProfileCount> spatialMatches{};
-    bool hasSpatialReference = false;
-    for (const auto& reference : references) {
-        hasSpatialReference = hasSpatialReference ||
-            (reference && reference->spatialProfiles.valid);
-    }
-    const auto sourceGrid = controls.spatialMatch > 0.0001f && hasSpatialReference
-        ? buckswood_lookdna::LookDNACore::analyzeGrid(
-              sampler,
-              controls.inputSpace,
-              controls.analysisQuality)
-        : buckswood_lookdna::ProfileGrid{};
-    if (sourceGrid.valid) {
-        for (int cell = 0; cell < buckswood_lookdna::SpatialProfileCount; ++cell) {
-            const std::array<const buckswood_lookdna::LookProfile*, 3> regionalReferences{
-                references[0] && references[0]->spatialProfiles.valid
-                    ? &references[0]->spatialProfiles.cells[static_cast<std::size_t>(cell)]
-                    : referenceProfiles[0],
-                references[1] && references[1]->spatialProfiles.valid
-                    ? &references[1]->spatialProfiles.cells[static_cast<std::size_t>(cell)]
-                    : referenceProfiles[1],
-                references[2] && references[2]->spatialProfiles.valid
-                    ? &references[2]->spatialProfiles.cells[static_cast<std::size_t>(cell)]
-                    : referenceProfiles[2],
+            auto analyzeNeighbor =
+                [&](const ImageInfo* info, buckswood_lookdna::LookProfile& profile)
+                -> const buckswood_lookdna::LookProfile* {
+                if (!info || controls.temporalStability <= 0.0001f) {
+                    return nullptr;
+                }
+                const SamplerType neighborSampler(*info);
+                profile = buckswood_lookdna::LookDNACore::analyze(
+                    neighborSampler,
+                    controls.inputSpace,
+                    controls.analysisQuality);
+                return profile.valid ? &profile : nullptr;
             };
-            std::array<float, 3> regionalWeights{};
-            const auto regionalReference = buckswood_lookdna::LookDNACore::blendReferenceProfiles(
-                sourceGrid.cells[static_cast<std::size_t>(cell)],
-                regionalReferences,
-                requestedReferenceWeights,
-                controls.referenceAdaptivity,
-                &regionalWeights);
-            auto regionalMatch = buckswood_lookdna::LookDNACore::buildMatch(
-                sourceGrid.cells[static_cast<std::size_t>(cell)],
-                regionalReference,
-                controls);
-            regionalMatch.referenceWeights = regionalWeights;
-            regionalMatch.temporalConfidence = temporalConfidence;
-            spatialMatches[static_cast<std::size_t>(cell)] = regionalMatch;
-        }
-    } else {
-        spatialMatches.fill(globalMatch);
-    }
+            buckswood_lookdna::LookProfile previous2Profile;
+            buckswood_lookdna::LookProfile previous1Profile;
+            buckswood_lookdna::LookProfile next1Profile;
+            buckswood_lookdna::LookProfile next2Profile;
+            const auto* previous2ProfilePtr =
+                analyzeNeighbor(previous2, previous2Profile);
+            const auto* previous1ProfilePtr =
+                analyzeNeighbor(previous1, previous1Profile);
+            const auto* next1ProfilePtr =
+                analyzeNeighbor(next1, next1Profile);
+            const auto* next2ProfilePtr =
+                analyzeNeighbor(next2, next2Profile);
+            float temporalConfidence = 1.0f;
+            const auto stableProfile =
+                buckswood_lookdna::LookDNACore::stabilizeProfile5(
+                    currentProfile,
+                    previous2ProfilePtr,
+                    previous1ProfilePtr,
+                    next1ProfilePtr,
+                    next2ProfilePtr,
+                    controls.temporalStability,
+                    &temporalConfidence);
+
+            const std::array<const buckswood_lookdna::LookProfile*, 3>
+                referenceProfiles{
+                    references[0] && references[0]->valid()
+                        ? &references[0]->profile
+                        : nullptr,
+                    references[1] && references[1]->valid()
+                        ? &references[1]->profile
+                        : nullptr,
+                    references[2] && references[2]->valid()
+                        ? &references[2]->profile
+                        : nullptr,
+                };
+            const std::array<float, 3> requestedReferenceWeights{
+                1.0f,
+                controls.referenceBMix,
+                controls.referenceCMix,
+            };
+            std::array<float, 3> normalizedReferenceWeights{};
+            const auto blendedReference =
+                buckswood_lookdna::LookDNACore::blendReferenceProfiles(
+                    stableProfile,
+                    referenceProfiles,
+                    requestedReferenceWeights,
+                    controls.referenceAdaptivity,
+                    &normalizedReferenceWeights);
+            result.globalMatch =
+                buckswood_lookdna::LookDNACore::buildMatch(
+                    stableProfile,
+                    blendedReference,
+                    controls);
+            result.globalMatch.referenceWeights =
+                normalizedReferenceWeights;
+            result.globalMatch.temporalConfidence =
+                temporalConfidence;
+
+            std::array<
+                buckswood_lookdna::MatchContext,
+                buckswood_lookdna::SpatialProfileCount>
+                spatialMatches{};
+            bool hasSpatialReference = false;
+            for (const auto& reference : references) {
+                hasSpatialReference =
+                    hasSpatialReference ||
+                    (reference && reference->spatialProfiles.valid);
+            }
+            const auto sourceGrid =
+                controls.spatialMatch > 0.0001f && hasSpatialReference
+                ? buckswood_lookdna::LookDNACore::analyzeGrid(
+                      sampler,
+                      controls.inputSpace,
+                      controls.analysisQuality)
+                : buckswood_lookdna::ProfileGrid{};
+            if (sourceGrid.valid) {
+                for (
+                    int cell = 0;
+                    cell < buckswood_lookdna::SpatialProfileCount;
+                    ++cell) {
+                    const std::array<
+                        const buckswood_lookdna::LookProfile*,
+                        3>
+                        regionalReferences{
+                            references[0] &&
+                                    references[0]->spatialProfiles.valid
+                                ? &references[0]
+                                       ->spatialProfiles
+                                       .cells[static_cast<std::size_t>(cell)]
+                                : referenceProfiles[0],
+                            references[1] &&
+                                    references[1]->spatialProfiles.valid
+                                ? &references[1]
+                                       ->spatialProfiles
+                                       .cells[static_cast<std::size_t>(cell)]
+                                : referenceProfiles[1],
+                            references[2] &&
+                                    references[2]->spatialProfiles.valid
+                                ? &references[2]
+                                       ->spatialProfiles
+                                       .cells[static_cast<std::size_t>(cell)]
+                                : referenceProfiles[2],
+                        };
+                    std::array<float, 3> regionalWeights{};
+                    const auto regionalReference =
+                        buckswood_lookdna::LookDNACore::
+                            blendReferenceProfiles(
+                                sourceGrid.cells[static_cast<std::size_t>(
+                                    cell)],
+                                regionalReferences,
+                                requestedReferenceWeights,
+                                controls.referenceAdaptivity,
+                                &regionalWeights);
+                    auto regionalMatch =
+                        buckswood_lookdna::LookDNACore::buildMatch(
+                            sourceGrid.cells[static_cast<std::size_t>(
+                                cell)],
+                            regionalReference,
+                            controls);
+                    regionalMatch.referenceWeights = regionalWeights;
+                    regionalMatch.temporalConfidence =
+                        temporalConfidence;
+                    spatialMatches[static_cast<std::size_t>(cell)] =
+                        regionalMatch;
+                }
+            } else {
+                spatialMatches.fill(result.globalMatch);
+            }
+
+            if (sourceGrid.valid) {
+                result.spatialLookupWidth =
+                    std::min(160, std::max(24, frame.width / 16));
+                result.spatialLookupHeight =
+                    std::min(90, std::max(14, frame.height / 16));
+                result.spatialLookup.resize(
+                    static_cast<std::size_t>(
+                        result.spatialLookupWidth *
+                        result.spatialLookupHeight));
+                for (
+                    int lookupY = 0;
+                    lookupY < result.spatialLookupHeight;
+                    ++lookupY) {
+                    const float normalizedY =
+                        (static_cast<float>(lookupY) + 0.5f) /
+                        static_cast<float>(result.spatialLookupHeight);
+                    for (
+                        int lookupX = 0;
+                        lookupX < result.spatialLookupWidth;
+                        ++lookupX) {
+                        const float normalizedX =
+                            (static_cast<float>(lookupX) + 0.5f) /
+                            static_cast<float>(
+                                result.spatialLookupWidth);
+                        result.spatialLookup[static_cast<std::size_t>(
+                            lookupY * result.spatialLookupWidth +
+                            lookupX)] =
+                            buckswood_lookdna::LookDNACore::
+                                sampleSpatialMatch(
+                                    result.globalMatch,
+                                    spatialMatches,
+                                    normalizedX,
+                                    normalizedY,
+                                    controls.spatialMatch,
+                                    controls.exposureLock,
+                                    controls.skinProtect,
+                                    controls.highlightProtect);
+                    }
+                }
+            }
+            return result;
+        });
 
     const buckswood_lookdna::Sampler* referencePreview =
         references[0] && references[0]->image
@@ -509,35 +770,6 @@ OfxStatus renderTyped(
             : references[2] && references[2]->image
                 ? static_cast<const buckswood_lookdna::Sampler*>(references[2]->image.get())
                 : nullptr;
-    const buckswood_lookdna::FrameInfo frame{
-        source.bounds.x2 - source.bounds.x1,
-        source.bounds.y2 - source.bounds.y1,
-        static_cast<int>(time),
-    };
-    int spatialLookupWidth = 0;
-    int spatialLookupHeight = 0;
-    std::vector<buckswood_lookdna::MatchContext> spatialLookup;
-    if (sourceGrid.valid) {
-        spatialLookupWidth = std::min(160, std::max(24, frame.width / 16));
-        spatialLookupHeight = std::min(90, std::max(14, frame.height / 16));
-        spatialLookup.resize(static_cast<std::size_t>(spatialLookupWidth * spatialLookupHeight));
-        for (int lookupY = 0; lookupY < spatialLookupHeight; ++lookupY) {
-            const float normalizedY =
-                (static_cast<float>(lookupY) + 0.5f) / static_cast<float>(spatialLookupHeight);
-            for (int lookupX = 0; lookupX < spatialLookupWidth; ++lookupX) {
-                const float normalizedX =
-                    (static_cast<float>(lookupX) + 0.5f) / static_cast<float>(spatialLookupWidth);
-                spatialLookup[static_cast<std::size_t>(
-                    lookupY * spatialLookupWidth + lookupX)] =
-                    buckswood_lookdna::LookDNACore::sampleSpatialMatch(
-                        globalMatch,
-                        spatialMatches,
-                        normalizedX,
-                        normalizedY,
-                        controls.spatialMatch);
-            }
-        }
-    }
     auto* destinationBase = reinterpret_cast<DstPixel*>(destination.data);
 
     auto renderRows = [&](int firstY, int lastY) {
@@ -555,16 +787,27 @@ OfxStatus renderTyped(
                 if (!destinationPixel) {
                     continue;
                 }
-                const buckswood_lookdna::MatchContext* pixelMatch = &globalMatch;
-                if (!spatialLookup.empty()) {
+                const buckswood_lookdna::MatchContext* pixelMatch =
+                    &prepared->globalMatch;
+                if (!prepared->spatialLookup.empty()) {
                     const int lookupX = std::min(
-                        spatialLookupWidth - 1,
-                        std::max(0, (x - source.bounds.x1) * spatialLookupWidth / std::max(1, frame.width)));
+                        prepared->spatialLookupWidth - 1,
+                        std::max(
+                            0,
+                            (x - source.bounds.x1) *
+                                prepared->spatialLookupWidth /
+                                std::max(1, frame.width)));
                     const int lookupY = std::min(
-                        spatialLookupHeight - 1,
-                        std::max(0, (y - source.bounds.y1) * spatialLookupHeight / std::max(1, frame.height)));
-                    pixelMatch = &spatialLookup[static_cast<std::size_t>(
-                        lookupY * spatialLookupWidth + lookupX)];
+                        prepared->spatialLookupHeight - 1,
+                        std::max(
+                            0,
+                            (y - source.bounds.y1) *
+                                prepared->spatialLookupHeight /
+                                std::max(1, frame.height)));
+                    pixelMatch =
+                        &prepared->spatialLookup[static_cast<std::size_t>(
+                            lookupY * prepared->spatialLookupWidth +
+                            lookupX)];
                 }
                 const buckswood_lookdna::Pixel output = controls.enabled
                     ? buckswood_lookdna::LookDNACore::processPixel(
@@ -897,7 +1140,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(properties, kOfxImageEffectPropTemporalClipAccess, 0, 1);
     gPropHost->propSetString(properties, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(properties, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(properties, kOfxPropLabel, 0, "Buckswood Look DNA v2.1");
+    gPropHost->propSetString(properties, kOfxPropLabel, 0, "Buckswood Look DNA v2.2");
     gPropHost->propSetString(properties, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(properties, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
     return kOfxStatOK;

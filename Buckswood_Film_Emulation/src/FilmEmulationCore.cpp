@@ -2,6 +2,48 @@
 
 namespace buckswood_film {
 
+FilmEmulationCore::PreparedState FilmEmulationCore::prepare(
+    const FrameInfo& frame,
+    const Controls& controls)
+{
+    PreparedState prepared{};
+    prepared.stock = stockForPreset(controls.stockPreset);
+    prepared.print = printForPreset(controls.printPreset);
+    prepared.frameSeed = static_cast<float>(frame.frameIndex);
+
+    const float weave = clamp01(controls.gateWeave);
+    prepared.weaveX =
+        std::sin(prepared.frameSeed * 0.417f + 1.7f) * 0.42f * weave +
+        std::sin(prepared.frameSeed * 0.113f + 5.3f) * 0.28f * weave;
+    prepared.weaveY =
+        std::sin(prepared.frameSeed * 0.311f + 0.2f) * 0.28f * weave +
+        std::sin(prepared.frameSeed * 0.071f + 4.1f) * 0.18f * weave;
+
+    const float flickerNoise = hash(17.0f, prepared.frameSeed, 9.13f) - 0.5f;
+    const float breathSlow = std::sin(prepared.frameSeed * 0.077f + 2.4f);
+    const float breathFast = std::sin(prepared.frameSeed * 0.193f + 4.0f);
+    const float breath =
+        (breathSlow * 0.65f + breathFast * 0.35f) *
+        clamp01(controls.filmBreath);
+    const float flickerGain =
+        1.0f +
+        flickerNoise * 0.055f * clamp01(controls.flicker) +
+        breath * 0.045f;
+    prepared.exposureGain =
+        std::pow(
+            2.0f,
+            clamp(
+                controls.exposure + controls.pushPull * 0.72f,
+                -4.0f,
+                4.0f)) *
+        flickerGain;
+    prepared.grainAmount =
+        clamp01(controls.grain + prepared.stock.grain * 0.55f);
+    prepared.colorStage = controls.processMode != 2;
+    prepared.textureStage = controls.processMode != 1;
+    return prepared;
+}
+
 FilmEmulationCore::StockModel FilmEmulationCore::stockForPreset(int preset)
 {
     switch (preset) {

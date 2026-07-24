@@ -1,4 +1,4 @@
-# Buckswood Film Emulation v2.0
+# Buckswood Film Emulation v2.1
 
 `Buckswood Film Emulation` is a native OpenFX film-finishing plugin for DaVinci Resolve. It is designed for two use cases: giving real camera footage a controlled negative/print finish, and making AI-generated footage feel less plastic, less digital, and more photographically coherent.
 

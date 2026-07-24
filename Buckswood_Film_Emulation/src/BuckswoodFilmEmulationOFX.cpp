@@ -32,7 +32,7 @@ OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 constexpr const char* kPluginIdentifier = "com.buckswood.film.emulation";
 constexpr const char* kSourceFrameRangeProp = "OfxImageClipPropFrameRange_Source";
 constexpr int kPluginMajorVersion = 2;
-constexpr int kPluginMinorVersion = 0;
+constexpr int kPluginMinorVersion = 1;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -405,6 +405,8 @@ OfxStatus renderTyped(
         nextInfo != nullptr,
         next2Info != nullptr,
     };
+    const buckswood_film::FilmEmulationCore::PreparedState prepared =
+        buckswood_film::FilmEmulationCore::prepare(frame, controls);
     auto* dst = reinterpret_cast<DstPixel*>(dstInfo.data);
 
     auto renderRows = [&](int yBegin, int yEnd) {
@@ -422,6 +424,7 @@ OfxStatus renderTyped(
                         y,
                         frame,
                         controls,
+                        prepared,
                         &temporal);
                     if constexpr (std::is_same<DstPixel, OfxRGBAColourF>::value) {
                         dstPix->r = out.r;
@@ -819,7 +822,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(effectProps, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood Film Emulation v2.0");
+    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood Film Emulation v2.1");
     gPropHost->propSetString(effectProps, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
     return kOfxStatOK;

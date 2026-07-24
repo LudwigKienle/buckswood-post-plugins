@@ -363,10 +363,19 @@ PRFILTERENTRY renderFakeDiagnostic(
     const FakeSampler sampler(view);
     const buckswood_fake::FrameInfo frame{width, height, frameIndex(video)};
     const int viewMode = roundedChoice(p[0], 4);
+    const auto prepared =
+        buckswood_fake::FakeDiagnosticCore::prepare(frame, controls);
     for (int y = 0; y < height; ++y) {
         auto* dst = reinterpret_cast<float*>(dstBase + y * dstRowBytes);
         for (int x = 0; x < width; ++x) {
-            const auto out = buckswood_fake::FakeDiagnosticCore::processPixel(sampler, x, y, frame, controls, viewMode);
+            const auto out = buckswood_fake::FakeDiagnosticCore::processPixel(
+                sampler,
+                x,
+                y,
+                frame,
+                controls,
+                prepared,
+                viewMode);
             writeBGRA32f(dst + x * 4, PixelF{out.r, out.g, out.b, out.a}, false);
         }
     }
@@ -452,10 +461,19 @@ PRFILTERENTRY renderFilmEmulation(
     const ImageViewF view{source.data(), width, height, width};
     const FilmSampler sampler(view);
     const buckswood_film::FrameInfo frame{width, height, frameIndex(video)};
+    const auto prepared =
+        buckswood_film::FilmEmulationCore::prepare(frame, controls);
     for (int y = 0; y < height; ++y) {
         auto* dst = reinterpret_cast<float*>(dstBase + y * dstRowBytes);
         for (int x = 0; x < width; ++x) {
-            const auto out = buckswood_film::FilmEmulationCore::processPixel(sampler, x, y, frame, controls);
+            const auto out = buckswood_film::FilmEmulationCore::processPixel(
+                sampler,
+                x,
+                y,
+                frame,
+                controls,
+                prepared,
+                nullptr);
             writeBGRA32f(dst + x * 4, PixelF{out.r, out.g, out.b, out.a}, true);
         }
     }
@@ -497,10 +515,25 @@ PRFILTERENTRY renderFrameDirector(
     auto focus = buckswood_cinematic::CinematicToolsCore::analyzeFocus(sampler, frame, c);
     focus = buckswood_cinematic::CinematicToolsCore::smoothFocus(focus, nullptr, nullptr, nullptr, nullptr, c);
     const auto crop = buckswood_cinematic::CinematicToolsCore::cropWindow(frame, c, focus);
+    const auto prepared =
+        buckswood_cinematic::CinematicToolsCore::prepareFrameDirector(
+            frame,
+            c,
+            crop);
     for (int y = 0; y < height; ++y) {
         auto* dst = reinterpret_cast<float*>(dstBase + y * dstRowBytes);
         for (int x = 0; x < width; ++x) {
-            const auto out = buckswood_cinematic::CinematicToolsCore::processFrameDirector(sampler, x, y, frame, c, focus, crop);
+            const auto out =
+                buckswood_cinematic::CinematicToolsCore::
+                    processFrameDirector(
+                        sampler,
+                        x,
+                        y,
+                        frame,
+                        c,
+                        focus,
+                        crop,
+                        prepared);
             writeBGRA32f(dst + x * 4, PixelF{out.r, out.g, out.b, out.a}, true);
         }
     }
@@ -535,10 +568,21 @@ PRFILTERENTRY renderRadianceRecover(
     const ImageViewF view{source.data(), width, height, width};
     const CinematicSampler sampler(view);
     const buckswood_cinematic::FrameInfo frame{width, height, frameIndex(video)};
+    const auto prepared =
+        buckswood_cinematic::CinematicToolsCore::prepareRadiance(c);
     for (int y = 0; y < height; ++y) {
         auto* dst = reinterpret_cast<float*>(dstBase + y * dstRowBytes);
         for (int x = 0; x < width; ++x) {
-            const auto out = buckswood_cinematic::CinematicToolsCore::processRadiance(sampler, x, y, frame, c, nullptr);
+            const auto out =
+                buckswood_cinematic::CinematicToolsCore::
+                    processRadiance(
+                        sampler,
+                        x,
+                        y,
+                        frame,
+                        c,
+                        prepared,
+                        nullptr);
             writeBGRA32f(dst + x * 4, PixelF{out.r, out.g, out.b, out.a}, true);
         }
     }

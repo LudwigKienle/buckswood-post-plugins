@@ -1,4 +1,4 @@
-# Buckswood Film Emulation v2.0
+# Buckswood Film Emulation v2.1
 
 Native OpenFX film-finishing plugin for DaVinci Resolve, built for real camera footage and AI-generated footage.
 

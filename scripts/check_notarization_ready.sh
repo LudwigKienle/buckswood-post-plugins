@@ -9,7 +9,7 @@ echo "================================"
 echo
 
 APP_IDENTITY="$(security find-identity -v -p codesigning | awk -F '"' -v team="$TEAM_ID" '$2 ~ /Developer ID Application:/ && (team == "" || $2 ~ team) { print $2; exit }')"
-INSTALLER_CERT="$(security find-certificate -c "Developer ID Installer" -a -Z 2>/dev/null | awk -F '"' -v team="$TEAM_ID" '$2 ~ /Developer ID Installer:/ && (team == "" || $2 ~ team) { print $2; exit }')"
+INSTALLER_CERT="$(security find-certificate -c "Developer ID Installer" -a -Z 2>/dev/null | awk -F '"' -v team="$TEAM_ID" '$4 ~ /Developer ID Installer:/ && (team == "" || $4 ~ team) { print $4; exit }')"
 
 if [[ -n "$APP_IDENTITY" ]]; then
     echo "OK   Developer ID Application: $APP_IDENTITY"

@@ -99,24 +99,6 @@ struct TemporalContext {
 
 class FilmEmulationCore {
 public:
-    template <typename SamplerT>
-    static Pixel processPixel(
-        const SamplerT& sampler,
-        int x,
-        int y,
-        const FrameInfo& frame,
-        const Controls& controls);
-
-    template <typename SamplerT>
-    static Pixel processPixel(
-        const SamplerT& sampler,
-        int x,
-        int y,
-        const FrameInfo& frame,
-        const Controls& controls,
-        const TemporalContext* temporal);
-
-private:
     struct StockModel {
         float contrast;
         float saturation;
@@ -145,6 +127,50 @@ private:
         float silver;
     };
 
+    struct PreparedState {
+        StockModel stock;
+        PrintModel print;
+        float frameSeed;
+        float weaveX;
+        float weaveY;
+        float exposureGain;
+        float grainAmount;
+        bool colorStage;
+        bool textureStage;
+    };
+
+    static PreparedState prepare(
+        const FrameInfo& frame,
+        const Controls& controls);
+
+    template <typename SamplerT>
+    static Pixel processPixel(
+        const SamplerT& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const Controls& controls);
+
+    template <typename SamplerT>
+    static Pixel processPixel(
+        const SamplerT& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const Controls& controls,
+        const TemporalContext* temporal);
+
+    template <typename SamplerT>
+    static Pixel processPixel(
+        const SamplerT& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const Controls& controls,
+        const PreparedState& prepared,
+        const TemporalContext* temporal);
+
+private:
     static StockModel stockForPreset(int preset);
     static PrintModel printForPreset(int preset);
 
@@ -378,55 +404,48 @@ Pixel FilmEmulationCore::processPixel(
     const Controls& controls,
     const TemporalContext* temporal)
 {
-    const float frameSeed = static_cast<float>(frame.frameIndex);
-    const float weave = clamp01(controls.gateWeave);
-    const float weaveX =
-        std::sin(frameSeed * 0.417f + 1.7f) * 0.42f * weave +
-        std::sin(frameSeed * 0.113f + 5.3f) * 0.28f * weave;
-    const float weaveY =
-        std::sin(frameSeed * 0.311f + 0.2f) * 0.28f * weave +
-        std::sin(frameSeed * 0.071f + 4.1f) * 0.18f * weave;
+    const PreparedState prepared = prepare(frame, controls);
+    return processPixel(sampler, x, y, frame, controls, prepared, temporal);
+}
 
-    const float sx = static_cast<float>(x) + weaveX;
-    const float sy = static_cast<float>(y) + weaveY;
+template <typename SamplerT>
+Pixel FilmEmulationCore::processPixel(
+    const SamplerT& sampler,
+    int x,
+    int y,
+    const FrameInfo& frame,
+    const Controls& controls,
+    const PreparedState& prepared,
+    const TemporalContext* temporal)
+{
+    const float sx = static_cast<float>(x) + prepared.weaveX;
+    const float sy = static_cast<float>(y) + prepared.weaveY;
     const Pixel dry = sampler.sample(static_cast<float>(x), static_cast<float>(y));
     Pixel scene = sampleDecoded(sampler, sx, sy, controls.inputSpace);
     scene = clampPixel(scene);
     const Pixel preTemporal = scene;
     scene = temporalReconstruct(scene, x, y, controls, temporal);
 
-    const StockModel stock = stockForPreset(controls.stockPreset);
-    const PrintModel print = printForPreset(controls.printPreset);
+    const StockModel& stock = prepared.stock;
+    const PrintModel& print = prepared.print;
     const float skin = skinMask(scene) * clamp01(controls.skinProtect);
-    const bool colorStage = controls.processMode != 2;
-    const bool textureStage = controls.processMode != 1;
-
-    const float flickerNoise = hash(17.0f, frameSeed, 9.13f) - 0.5f;
-    const float breathSlow = std::sin(frameSeed * 0.077f + 2.4f);
-    const float breathFast = std::sin(frameSeed * 0.193f + 4.0f);
-    const float breath = (breathSlow * 0.65f + breathFast * 0.35f) * clamp01(controls.filmBreath);
-    const float flickerGain =
-        1.0f +
-        flickerNoise * 0.055f * clamp01(controls.flicker) +
-        breath * 0.045f;
-    const float exposureGain = std::pow(2.0f, clamp(controls.exposure + controls.pushPull * 0.72f, -4.0f, 4.0f)) * flickerGain;
-    scene.r *= exposureGain;
-    scene.g *= exposureGain;
-    scene.b *= exposureGain;
+    scene.r *= prepared.exposureGain;
+    scene.g *= prepared.exposureGain;
+    scene.b *= prepared.exposureGain;
 
     Pixel worked = scene;
-    if (colorStage) {
+    if (prepared.colorStage) {
         worked = applyDeveloper(worked, controls, skin);
         worked = applyStock(worked, stock, controls, skin);
         worked = applyFilmCompression(worked, controls);
     }
-    const Pixel optics = textureStage
+    const Pixel optics = prepared.textureStage
         ? opticalPass(sampler, sx, sy, scene, controls, stock)
         : Pixel{0.0f, 0.0f, 0.0f, scene.a};
-    if (textureStage) {
+    if (prepared.textureStage) {
         worked = add(worked, optics);
     }
-    if (colorStage) {
+    if (prepared.colorStage) {
         worked = applyPrinterLights(worked, controls);
         worked = applyPrint(worked, print, controls);
         worked = applyExpand(worked, controls);
@@ -447,13 +466,12 @@ Pixel FilmEmulationCore::processPixel(
         }
     }
 
-    const float grainAmount = clamp01(controls.grain + stock.grain * 0.55f);
     const float yScene = luma(worked);
     const float grainMask = toneGrainMask(yScene, controls) *
         (0.55f + 0.45f * smoothstep(0.01f, 0.12f, yScene));
-    if (textureStage && grainAmount > 0.0001f) {
+    if (prepared.textureStage && prepared.grainAmount > 0.0001f) {
         const float resolutionBlur = 1.0f + (1.0f - clamp01(controls.filmResolution)) * 0.32f;
-        const float base = grainAmount * grainMask * 0.042f * resolutionBlur;
+        const float base = prepared.grainAmount * grainMask * 0.042f * resolutionBlur;
         const float mono = grainValue(x, y, frame.frameIndex, controls.grainSize, 0, controls.grainMode);
         const float r = grainValue(x, y, frame.frameIndex, controls.grainSize, 1, controls.grainMode);
         const float g = grainValue(x, y, frame.frameIndex, controls.grainSize, 2, controls.grainMode);
@@ -465,9 +483,9 @@ Pixel FilmEmulationCore::processPixel(
     }
 
     const float dustAmount = clamp01(controls.dust);
-    if (textureStage && dustAmount > 0.0001f) {
+    if (prepared.textureStage && dustAmount > 0.0001f) {
         const float staticDust = hash(std::floor(static_cast<float>(x) / 3.0f), std::floor(static_cast<float>(y) / 3.0f), 37.0f);
-        const float movingDust = hash(std::floor(static_cast<float>(x) / 6.0f), frameSeed + std::floor(static_cast<float>(y) / 19.0f), 81.0f);
+        const float movingDust = hash(std::floor(static_cast<float>(x) / 6.0f), prepared.frameSeed + std::floor(static_cast<float>(y) / 19.0f), 81.0f);
         const float whiteSpeck = smoothstep(0.9975f - dustAmount * 0.006f, 1.0f, staticDust) * 0.16f * dustAmount;
         const float blackSpeck = smoothstep(0.9970f - dustAmount * 0.006f, 1.0f, movingDust) * 0.11f * dustAmount;
         worked.r = worked.r * (1.0f - blackSpeck) + whiteSpeck;
@@ -476,10 +494,10 @@ Pixel FilmEmulationCore::processPixel(
     }
 
     const float scratches = clamp01(controls.scratches);
-    if (textureStage && scratches > 0.0001f) {
-        const float column = hash(std::floor(static_cast<float>(x) / 2.0f), std::floor(frameSeed / 3.0f), 301.0f);
+    if (prepared.textureStage && scratches > 0.0001f) {
+        const float column = hash(std::floor(static_cast<float>(x) / 2.0f), std::floor(prepared.frameSeed / 3.0f), 301.0f);
         const float streak = smoothstep(0.9980f - scratches * 0.006f, 1.0f, column);
-        const float broken = hash(std::floor(static_cast<float>(y) / 11.0f), frameSeed, 307.0f);
+        const float broken = hash(std::floor(static_cast<float>(y) / 11.0f), prepared.frameSeed, 307.0f);
         const float line = streak * smoothstep(0.18f, 0.92f, broken) * scratches * 0.18f;
         worked.r += line;
         worked.g += line * 0.92f;

@@ -1,11 +1,11 @@
-Buckswood Cinematic Tools v2.0
+Buckswood Cinematic Tools v2.1
 ================================
 
 Includes:
 
-- Buckswood Frame Director v2.0
-- Buckswood Radiance Recover v2.0
-- Buckswood Temporal Integrity v2.0
+- Buckswood Frame Director v2.1
+- Buckswood Radiance Recover v2.1
+- Buckswood Temporal Integrity v2.1
 
 Installation:
 

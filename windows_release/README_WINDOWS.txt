@@ -25,20 +25,20 @@ Color Page > OpenFX > Buckswood > Buckswood Film Emulation
 Color Page > OpenFX > Buckswood > Buckswood Frame Director
 Color Page > OpenFX > Buckswood > Buckswood Radiance Recover
 Color Page > OpenFX > Buckswood > Buckswood Temporal Integrity
-Color Page > OpenFX > Buckswood > Buckswood Look DNA v2.0
+Color Page > OpenFX > Buckswood > Buckswood Look DNA v2.2
 Color Page > DCTL > Buckswood_Lens_Physics_v01
 Color Page > DCTL > Buckswood_AI_Photorealizer_v01
 
 Included OFX versions:
 
-Buckswood Fake Diagnostic v2.1
+Buckswood Fake Diagnostic v2.2
 Buckswood Lens Physics v0.5 Metal/OpenCL Performance
 Buckswood AI Photorealizer v0.3 Metal/OpenCL Performance
-Buckswood Film Emulation v2.0
-Buckswood Frame Director v2.0
-Buckswood Radiance Recover v2.0
-Buckswood Temporal Integrity v2.0
-Buckswood Look DNA v2.0
+Buckswood Film Emulation v2.1
+Buckswood Frame Director v2.1
+Buckswood Radiance Recover v2.1
+Buckswood Temporal Integrity v2.1
+Buckswood Look DNA v2.2
 
 Optional ML companion:
 

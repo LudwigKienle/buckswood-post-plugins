@@ -1,4 +1,4 @@
-# Buckswood Look DNA v2.1
+# Buckswood Look DNA v2.2
 
 ## Was Das Plugin Macht
 

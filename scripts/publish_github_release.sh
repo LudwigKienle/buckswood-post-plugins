@@ -5,10 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GH_BIN="${GH_BIN:-gh}"
 REPO_NAME="${REPO_NAME:-buckswood-post-plugins}"
 VISIBILITY="${VISIBILITY:-public}"
-TAG="${TAG:-v2.2.0}"
-TITLE="${TITLE:-Buckswood Post Plugins v2.2.0 (Beta)}"
+TAG="${TAG:-v2.4.0}"
+TITLE="${TITLE:-Buckswood Post Plugins v2.4.0}"
 RELEASE_DIR="${RELEASE_DIR:-}"
-NOTES_FILE="${NOTES_FILE:-$ROOT_DIR/docs/RELEASE_NOTES_v2.2.0.md}"
+NOTES_FILE="${NOTES_FILE:-$ROOT_DIR/docs/RELEASE_NOTES_v2.4.0.md}"
+PRERELEASE="${PRERELEASE:-false}"
 
 if [[ -z "$RELEASE_DIR" ]]; then
     if [[ -d "$ROOT_DIR/release" ]]; then
@@ -23,10 +24,16 @@ fi
 
 "$GH_BIN" auth status >/dev/null
 
+CURRENT_BRANCH="$(git branch --show-current)"
+[[ -n "$CURRENT_BRANCH" ]] || {
+    echo "Publish from a named branch, not detached HEAD." >&2
+    exit 1
+}
+
 if ! git remote get-url origin >/dev/null 2>&1; then
     if "$GH_BIN" repo view "$REPO_NAME" >/dev/null 2>&1; then
         git remote add origin "$("$GH_BIN" repo view "$REPO_NAME" --json sshUrl --jq .sshUrl)"
-        git push -u origin main
+        git push -u origin "$CURRENT_BRANCH"
     else
         if [[ "$VISIBILITY" == "private" ]]; then
             "$GH_BIN" repo create "$REPO_NAME" --private --source "$ROOT_DIR" --remote origin --push
@@ -35,7 +42,7 @@ if ! git remote get-url origin >/dev/null 2>&1; then
         fi
     fi
 else
-    git push -u origin main
+    git push -u origin "$CURRENT_BRANCH"
 fi
 
 assets=(
@@ -62,17 +69,22 @@ for asset in "${assets[@]}"; do
     existing_assets+=("$asset")
 done
 
+release_flags=()
+if [[ "$PRERELEASE" == "true" ]]; then
+    release_flags+=(--prerelease)
+fi
+
 if "$GH_BIN" release view "$TAG" >/dev/null 2>&1; then
     "$GH_BIN" release edit "$TAG" \
         --title "$TITLE" \
         --notes-file "$NOTES_FILE" \
-        --prerelease
+        "${release_flags[@]}"
     "$GH_BIN" release upload "$TAG" "${existing_assets[@]}" --clobber
 else
     "$GH_BIN" release create "$TAG" "${existing_assets[@]}" \
         --title "$TITLE" \
         --notes-file "$NOTES_FILE" \
-        --prerelease
+        "${release_flags[@]}"
 fi
 
 "$GH_BIN" repo view --web >/dev/null 2>&1 || true

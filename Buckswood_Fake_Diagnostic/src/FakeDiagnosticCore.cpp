@@ -4,6 +4,25 @@
 
 namespace buckswood_fake {
 
+FakeDiagnosticCore::PreparedState FakeDiagnosticCore::prepare(
+    const FrameInfo& frame,
+    const Controls& controls)
+{
+    const float weightSum = std::max(
+        0.001f,
+        controls.plasticWeight +
+            controls.highlightWeight +
+            controls.edgeWeight +
+            controls.gradeWeight +
+            controls.textureWeight +
+            controls.temporalWeight);
+    return PreparedState{
+        weightSum,
+        frame.frameIndex + static_cast<int>(controls.seed * 13.0f),
+        frame.frameIndex + static_cast<int>(controls.seed * 29.0f),
+    };
+}
+
 Controls FakeDiagnosticCore::defaultControls()
 {
     return Controls{

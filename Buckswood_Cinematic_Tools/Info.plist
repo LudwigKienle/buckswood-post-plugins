@@ -11,12 +11,12 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Buckswood Cinematic Tools v2.0</string>
+  <string>Buckswood Cinematic Tools v2.1</string>
   <key>CFBundlePackageType</key>
   <string>BNDL</string>
   <key>CFBundleShortVersionString</key>
-  <string>2.0.0</string>
+  <string>2.1.0</string>
   <key>CFBundleVersion</key>
-  <string>2.0.0</string>
+  <string>2.1.0</string>
 </dict>
 </plist>

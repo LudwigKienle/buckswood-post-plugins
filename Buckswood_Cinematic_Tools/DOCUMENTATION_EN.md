@@ -1,4 +1,4 @@
-# Buckswood Cinematic Tools v2.0
+# Buckswood Cinematic Tools v2.1
 
 ## Frame Director v2
 

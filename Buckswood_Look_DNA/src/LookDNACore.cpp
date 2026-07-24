@@ -885,6 +885,11 @@ MatchContext LookDNACore::buildMatch(
     const float safety = 1.0f + (confidenceFloor - 1.0f) * clamp01(controls.sceneIdentityGuard);
     match.guardedStrength = clamp01(controls.matchStrength) * safety;
     match.valid = true;
+    prepareMatch(
+        match,
+        controls.exposureLock,
+        controls.skinProtect,
+        controls.highlightProtect);
     return match;
 }
 
@@ -893,7 +898,10 @@ MatchContext LookDNACore::sampleSpatialMatch(
     const std::array<MatchContext, SpatialProfileCount>& spatialMatches,
     float normalizedX,
     float normalizedY,
-    float spatialStrength)
+    float spatialStrength,
+    float exposureLock,
+    float skinProtect,
+    float highlightProtect)
 {
     if (!globalMatch.valid || spatialStrength <= 0.0001f) {
         return globalMatch;
@@ -934,21 +942,89 @@ MatchContext LookDNACore::sampleSpatialMatch(
     };
     MatchContext result = weightedMatchList(finalMatches, finalWeights, globalMatch);
     result.spatialInfluence = localAmount;
+    prepareMatch(
+        result,
+        exposureLock,
+        skinProtect,
+        highlightProtect);
     return result;
+}
+
+void LookDNACore::prepareMatch(
+    MatchContext& match,
+    float exposureLock,
+    float skinProtect,
+    float highlightProtect)
+{
+    if (!match.valid) {
+        return;
+    }
+
+    match.toneTarget = match.reference.lumaQuantiles;
+    const float exposureOffset =
+        match.source.lumaQuantiles[3] -
+        match.reference.lumaQuantiles[3];
+    for (float& knot : match.toneTarget) {
+        knot += exposureOffset * clamp01(exposureLock);
+    }
+    for (
+        std::size_t index = 1;
+        index < match.toneTarget.size();
+        ++index) {
+        match.toneTarget[index] =
+            std::max(
+                match.toneTarget[index],
+                match.toneTarget[index - 1] + 0.0002f);
+    }
+
+    match.densityRatio = clamp(
+        match.reference.saturationMean /
+            std::max(0.015f, match.source.saturationMean),
+        0.72f,
+        1.34f);
+    match.detailRatio = clamp(
+        match.reference.localContrast /
+            std::max(0.0004f, match.source.localContrast),
+        0.68f,
+        1.38f);
+    match.extraGrain =
+        std::max(
+            0.0f,
+            match.reference.grainEstimate -
+                match.source.grainEstimate);
+
+    for (int zone = 0; zone < SemanticZoneCount; ++zone) {
+        const SemanticZone& sourceZone = match.source.zones[zone];
+        const SemanticZone& referenceZone =
+            match.reference.zones[zone];
+        if (
+            sourceZone.weight < 0.004f ||
+            referenceZone.weight < 0.004f) {
+            match.semanticOverlap[zone] = 0.0f;
+            match.semanticZoneGuard[zone] = 0.0f;
+            continue;
+        }
+        const float overlap = std::sqrt(
+            std::min(sourceZone.weight, referenceZone.weight) /
+            std::max(sourceZone.weight, referenceZone.weight));
+        float zoneGuard = 1.0f;
+        if (zone == SkinZone) {
+            zoneGuard -= clamp01(skinProtect) * 0.78f;
+        }
+        if (zone == HighlightZone) {
+            zoneGuard -= clamp01(highlightProtect) * 0.72f;
+        }
+        match.semanticOverlap[zone] = overlap;
+        match.semanticZoneGuard[zone] = zoneGuard;
+    }
 }
 
 float LookDNACore::mapTone(float value, const MatchContext& match, float exposureLock)
 {
-    std::array<float, 7> target = match.reference.lumaQuantiles;
-    const float exposureOffset = match.source.lumaQuantiles[3] - match.reference.lumaQuantiles[3];
-    for (float& knot : target) {
-        knot += exposureOffset * clamp01(exposureLock);
-    }
-    for (std::size_t index = 1; index < target.size(); ++index) {
-        target[index] = std::max(target[index], target[index - 1] + 0.0002f);
-    }
+    (void)exposureLock;
 
     const auto& source = match.source.lumaQuantiles;
+    const auto& target = match.toneTarget;
     if (value <= source.front()) {
         return target.front() + (value - source.front());
     }
@@ -1066,24 +1142,22 @@ Pixel LookDNACore::processPixel(
         float semanticV = 0.0f;
         float semanticWeight = 0.0f;
         for (int zone = 0; zone < SemanticZoneCount; ++zone) {
-            const SemanticZone& sourceZone = match.source.zones[zone];
-            const SemanticZone& referenceZone = match.reference.zones[zone];
-            if (sourceZone.weight < 0.004f || referenceZone.weight < 0.004f) {
+            const float overlap = match.semanticOverlap[zone];
+            if (overlap == 0.0f) {
                 continue;
             }
-            const float overlap = std::sqrt(
-                std::min(sourceZone.weight, referenceZone.weight) /
-                std::max(sourceZone.weight, referenceZone.weight));
-            float zoneGuard = 1.0f;
-            if (zone == SkinZone) {
-                zoneGuard -= clamp01(controls.skinProtect) * 0.78f;
-            }
-            if (zone == HighlightZone) {
-                zoneGuard -= clamp01(controls.highlightProtect) * 0.72f;
-            }
-            const float weight = masks[zone] * overlap * zoneGuard;
-            semanticU += (referenceZone.meanU - sourceZone.meanU) * weight;
-            semanticV += (referenceZone.meanV - sourceZone.meanV) * weight;
+            const SemanticZone& sourceZone =
+                match.source.zones[zone];
+            const SemanticZone& referenceZone =
+                match.reference.zones[zone];
+            const float weight =
+                masks[zone] *
+                overlap *
+                match.semanticZoneGuard[zone];
+            semanticU +=
+                (referenceZone.meanU - sourceZone.meanU) * weight;
+            semanticV +=
+                (referenceZone.meanV - sourceZone.meanV) * weight;
             semanticWeight += weight;
         }
         if (semanticWeight > 0.0001f) {
@@ -1099,13 +1173,11 @@ Pixel LookDNACore::processPixel(
         }
 
         const float densityY = luma(matched);
-        const float densityRatio = clamp(
-            match.reference.saturationMean / std::max(0.015f, match.source.saturationMean),
-            0.72f,
-            1.34f);
         const float densityAmount = guarded * clamp01(controls.densityMatch) *
             rangeTransfer * colorGuard * 0.55f;
-        const float densityScale = 1.0f + (densityRatio - 1.0f) * densityAmount;
+        const float densityScale =
+            1.0f +
+            (match.densityRatio - 1.0f) * densityAmount;
         matched.r = densityY + (matched.r - densityY) * densityScale;
         matched.g = densityY + (matched.g - densityY) * densityScale;
         matched.b = densityY + (matched.b - densityY) * densityScale;
@@ -1119,22 +1191,17 @@ Pixel LookDNACore::processPixel(
         const Pixel down = encodedToWorking(sampler.sample(static_cast<float>(x), y + radius), controls.inputSpace);
         const float blurY = (luma(left) + luma(right) + luma(up) + luma(down)) * 0.25f;
         const float detail = sourceY - blurY;
-        const float detailRatio = clamp(
-            match.reference.localContrast / std::max(0.0004f, match.source.localContrast),
-            0.68f,
-            1.38f);
         const float edgeGuard = 1.0f - smoothstep(0.035f, 0.16f, std::fabs(detail));
         const float detailDelta = clamp(
-            detail * (detailRatio - 1.0f) * guarded * clamp01(controls.localContrastMatch) * edgeGuard,
+            detail * (match.detailRatio - 1.0f) * guarded * clamp01(controls.localContrastMatch) * edgeGuard,
             -0.035f,
             0.035f);
         matched.r += detailDelta;
         matched.g += detailDelta;
         matched.b += detailDelta;
 
-        const float extraGrain = std::max(0.0f, match.reference.grainEstimate - match.source.grainEstimate);
         const float grainAmount = clamp(
-            extraGrain * 1.8f * guarded * clamp01(controls.grainMatch) * clamp01(controls.textureMatch),
+            match.extraGrain * 1.8f * guarded * clamp01(controls.grainMatch) * clamp01(controls.textureMatch),
             0.0f,
             0.018f);
         const float noise = hash(x, y, frame.frameIndex) - 0.5f;

@@ -1,4 +1,4 @@
-# Buckswood Look DNA v2.1
+# Buckswood Look DNA v2.2
 
 Reference-still look matching for OpenFX hosts. Look DNA analyzes the tonal,
 chromatic, local-contrast, texture, and broad semantic character of a reference

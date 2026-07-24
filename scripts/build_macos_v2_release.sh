@@ -26,7 +26,7 @@ can_notarize() {
 }
 
 declare -a SRC_PKGS=(
-    "Buckswood_Fake_Diagnostic/release/Buckswood_Fake_Diagnostic_Installer.pkg|Buckswood_Fake_Diagnostic_v2.1_Installer.pkg"
+    "Buckswood_Fake_Diagnostic/release/Buckswood_Fake_Diagnostic_Installer.pkg|Buckswood_Fake_Diagnostic_v2.2_Installer.pkg"
     "Buckswood_AI_Photorealizer/release/Buckswood_AI_Photorealizer_Installer.pkg|Buckswood_AI_Photorealizer_v0.3_GPU_Installer.pkg"
     "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer.pkg|Buckswood_Lens_Physics_v0.5_GPU_Installer.pkg"
     "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer.pkg|Buckswood_Film_Emulation_v2_Installer.pkg"
@@ -44,7 +44,7 @@ Release for DaVinci Resolve / OpenFX on macOS and Windows.
 
 ## Included macOS Installers
 
-- `Buckswood_Fake_Diagnostic_v2.1_Installer.pkg`
+- `Buckswood_Fake_Diagnostic_v2.2_Installer.pkg`
   - temporal diagnostics
   - Adjustment Layer Guard
   - safer default temporal behavior
@@ -62,16 +62,18 @@ Release for DaVinci Resolve / OpenFX on macOS and Windows.
   - preserves lens character in texture, glow, and highlights
 
 - `Buckswood_Film_Emulation_v2_Installer.pkg`
+  - Film Emulation v2.1 with per-frame prepared stock and texture state
   - AI-footage-first film finishing
   - negative/print process, film compression, printer lights, grain, halation, bloom
   - Temporal AI Reconstruction and optional ML companion notes
 
 - `Buckswood_Cinematic_Tools_v2_Installer.pkg`
-  - Frame Director
-  - Radiance Recover
-  - Temporal Integrity
+  - Frame Director v2.1 with shared five-frame analysis cache
+  - Radiance Recover v2.1 with bounded full-frame ML cache
+  - Temporal Integrity v2.1 with prepared thresholds
 
 - `Buckswood_Look_DNA_v2_Installer.pkg`
+  - Look DNA v2.2 with bounded source/reference analysis cache
   - three-reference tone, palette, semantic-region, and texture matching
   - overlapping 3x3 spatial map and five-frame cut-aware analysis
   - skin, highlight, scene-identity, temporal, and gamut protection
@@ -150,6 +152,25 @@ if [[ -f "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Setup.exe" 
     cp "$ROOT_DIR/windows_release/public/Buckswood_Resolve_Plugins_Windows.zip" "$RELEASE_DIR/Buckswood_Resolve_Plugins_v2_Windows.zip"
 fi
 
+declare -a HOST_RELEASE_ASSETS=(
+    "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer.dmg"
+    "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer.pkg"
+    "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_Installer.dmg"
+    "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_Installer.pkg"
+    "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer.dmg"
+    "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer.pkg"
+    "nuke_release/Buckswood_Nuke_OFX_v2.zip"
+    "premiere_port/release/Buckswood_Premiere_Native_macOS.zip"
+    "premiere_port/release/Buckswood_Premiere_Native_Windows.zip"
+    "premiere_port/release/Buckswood_Premiere_Plugins_Setup.exe"
+)
+for relative_asset in "${HOST_RELEASE_ASSETS[@]}"; do
+    source_asset="$ROOT_DIR/$relative_asset"
+    if [[ -f "$source_asset" ]]; then
+        cp "$source_asset" "$RELEASE_DIR/$(basename "$source_asset")"
+    fi
+done
+
 (
     cd "$V2_DIR"
     {
@@ -200,8 +221,20 @@ fi
 
     {
         cat Buckswood_Resolve_Plugins_v2_SHA256SUMS.txt
-        for f in Buckswood_Nuke_OFX_v2.zip Buckswood_Premiere_Native_macOS.zip Buckswood_Premiere_Native_Windows.zip Buckswood_Premiere_Plugins_Setup.exe; do
-            [[ -f "$f" ]] && shasum -a 256 "$f"
+        for f in \
+            Buckswood_Film_Emulation_v2_Installer.dmg \
+            Buckswood_Film_Emulation_v2_Installer.pkg \
+            Buckswood_Cinematic_Tools_v2_Installer.dmg \
+            Buckswood_Cinematic_Tools_v2_Installer.pkg \
+            Buckswood_Look_DNA_v2_Installer.dmg \
+            Buckswood_Look_DNA_v2_Installer.pkg \
+            Buckswood_Nuke_OFX_v2.zip \
+            Buckswood_Premiere_Native_macOS.zip \
+            Buckswood_Premiere_Native_Windows.zip \
+            Buckswood_Premiere_Plugins_Setup.exe; do
+            if [[ -f "$f" ]]; then
+                shasum -a 256 "$f"
+            fi
         done
     } > Buckswood_Post_Plugins_v2_AllHosts_SHA256SUMS.txt
 )

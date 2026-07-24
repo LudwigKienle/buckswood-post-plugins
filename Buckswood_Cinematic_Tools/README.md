@@ -2,17 +2,17 @@
 
 Three native OpenFX tools for AI footage in DaVinci Resolve:
 
-- **Buckswood Frame Director v2.0**
+- **Buckswood Frame Director v2.1**
   - intelligent aspect-ratio preview and composition guides
   - 2.39:1, 2.00:1, 1.85:1, 16:9, 4:3, 1:1 and 9:16
   - five-frame saliency analysis, shot-cut protection and Subject Lock
 
-- **Buckswood Radiance Recover v2.0**
+- **Buckswood Radiance Recover v2.1**
   - conservative inverse tone expansion for SDR and AI footage
   - highlight headroom above 1.0 in floating-point hosts
   - optional HDRTVNet++ ML cache with per-pixel confidence
 
-- **Buckswood Temporal Integrity v2.0**
+- **Buckswood Temporal Integrity v2.1**
   - detects frame-to-frame flicker and unstable texture
   - five-frame consensus, Motion Guard, Edge Protection and Ghost Guard
   - error, confidence, motion and ghost-risk views

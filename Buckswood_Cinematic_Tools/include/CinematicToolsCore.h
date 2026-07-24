@@ -138,6 +138,31 @@ struct TemporalIntegrityControls {
 
 class CinematicToolsCore {
 public:
+    struct FrameDirectorState {
+        float inverseWidth;
+        float inverseHeight;
+        float featherPixels;
+        float cropWidth;
+        float cropHeight;
+        float inverseCropWidth;
+        float inverseCropHeight;
+        float guideThickness;
+    };
+
+    struct RadianceState {
+        float headroom;
+        float softLimit;
+    };
+
+    struct TemporalIntegrityState {
+        float agreementLow;
+        float agreementHigh;
+        float outlierLow;
+        float outlierHigh;
+        float motionGuard;
+        float edgeProtection;
+    };
+
     static FrameDirectorControls defaultFrameDirectorControls();
     static RadianceControls defaultRadianceControls();
     static TemporalIntegrityControls defaultTemporalIntegrityControls();
@@ -162,6 +187,17 @@ public:
         const FrameDirectorControls& controls,
         const FocusAnalysis& focus);
 
+    static FrameDirectorState prepareFrameDirector(
+        const FrameInfo& frame,
+        const FrameDirectorControls& controls,
+        const CropWindow& crop);
+
+    static RadianceState prepareRadiance(
+        const RadianceControls& controls);
+
+    static TemporalIntegrityState prepareTemporalIntegrity(
+        const TemporalIntegrityControls& controls);
+
     static Pixel processFrameDirector(
         const Sampler& sampler,
         int x,
@@ -171,6 +207,16 @@ public:
         const FocusAnalysis& focus,
         const CropWindow& crop);
 
+    static Pixel processFrameDirector(
+        const Sampler& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const FrameDirectorControls& controls,
+        const FocusAnalysis& focus,
+        const CropWindow& crop,
+        const FrameDirectorState& prepared);
+
     static Pixel processRadiance(
         const Sampler& sampler,
         int x,
@@ -179,12 +225,30 @@ public:
         const RadianceControls& controls,
         const TemporalContext* temporal);
 
+    static Pixel processRadiance(
+        const Sampler& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const RadianceControls& controls,
+        const RadianceState& prepared,
+        const TemporalContext* temporal);
+
     static Pixel processTemporalIntegrity(
         const Sampler& sampler,
         int x,
         int y,
         const FrameInfo& frame,
         const TemporalIntegrityControls& controls,
+        const TemporalContext* temporal);
+
+    static Pixel processTemporalIntegrity(
+        const Sampler& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const TemporalIntegrityControls& controls,
+        const TemporalIntegrityState& prepared,
         const TemporalContext* temporal);
 
 private:

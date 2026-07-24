@@ -144,10 +144,16 @@ public:
 struct MatchContext {
     LookProfile source;
     LookProfile reference;
+    std::array<float, 7> toneTarget{};
     float chromaM00 = 1.0f;
     float chromaM01 = 0.0f;
     float chromaM10 = 0.0f;
     float chromaM11 = 1.0f;
+    float densityRatio = 1.0f;
+    float detailRatio = 1.0f;
+    float extraGrain = 0.0f;
+    std::array<float, SemanticZoneCount> semanticOverlap{};
+    std::array<float, SemanticZoneCount> semanticZoneGuard{};
     float confidence = 0.0f;
     float guardedStrength = 0.0f;
     std::array<float, 3> referenceWeights{1.0f, 0.0f, 0.0f};
@@ -200,7 +206,10 @@ public:
         const std::array<MatchContext, SpatialProfileCount>& spatialMatches,
         float normalizedX,
         float normalizedY,
-        float spatialStrength);
+        float spatialStrength,
+        float exposureLock = 0.35f,
+        float skinProtect = 0.72f,
+        float highlightProtect = 0.74f);
 
     static Pixel processPixel(
         const Sampler& sampler,
@@ -238,6 +247,11 @@ private:
     static float linearToWorking(float value);
     static float workingToLinear(float value);
     static float mapTone(float value, const MatchContext& match, float exposureLock);
+    static void prepareMatch(
+        MatchContext& match,
+        float exposureLock,
+        float skinProtect,
+        float highlightProtect);
     static float hueDegrees(Pixel pixel);
     static float saturation(Pixel pixel);
     static std::array<float, SemanticZoneCount> semanticMasks(

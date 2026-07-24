@@ -55,7 +55,7 @@ descriptor-test: bundle $(BUILD_DIR)/ofx_descriptor_smoketest
 	$(BUILD_DIR)/ofx_descriptor_smoketest \
 		$(BUNDLE_DIR)/Contents/MacOS/$(OFX_BINARY)
 
-$(BUILD_DIR)/radiance_cache_reader_smoketest: $(CORE_SRC) src/radiance_cache_reader_smoketest.cpp | $(BUILD_DIR)
+$(BUILD_DIR)/radiance_cache_reader_smoketest: $(CORE_SRC) $(OFX_SRC) src/radiance_cache_reader_smoketest.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(CORE_SRC) src/radiance_cache_reader_smoketest.cpp -o $@
 
 cache-reader-test: $(BUILD_DIR)/radiance_cache_reader_smoketest
