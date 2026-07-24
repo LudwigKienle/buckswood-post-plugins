@@ -85,8 +85,9 @@ COMMON_FLAGS=(
   -shared \
   "$ROOT_DIR/Buckswood_Look_DNA/src/LookDNACore.cpp" \
   "$ROOT_DIR/Buckswood_Look_DNA/src/ReferenceImageLoader.cpp" \
+  "$ROOT_DIR/Buckswood_Look_DNA/src/ReferenceFileDialogWin.cpp" \
   "$ROOT_DIR/Buckswood_Look_DNA/src/BuckswoodLookDNAOFX.cpp" \
-  -lwindowscodecs -lole32 -luuid \
+  -lwindowscodecs -lole32 -luuid -lcomdlg32 \
   -o "$BUILD_DIR/BuckswoodLookDNA.ofx"
 
 cp "$BUILD_DIR/BuckswoodFakeDiagnostic.ofx" "$PAYLOAD_DIR/OFX/Plugins/BuckswoodFakeDiagnostic.ofx.bundle/Contents/Win64/BuckswoodFakeDiagnostic.ofx"

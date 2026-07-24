@@ -11,7 +11,7 @@ This repository contains the source for eight Buckswood Resolve tools:
 - **Buckswood Frame Director v2.0** - five-frame, cut-aware composition assistance with Subject Lock.
 - **Buckswood Radiance Recover v2.0** - floating-point SDR radiance expansion with an optional HDRTVNet++ cache.
 - **Buckswood Temporal Integrity v2.0** - five-frame repair with confidence and ghost-risk protection.
-- **Buckswood Look DNA v2.0** - three-reference, spatial and five-frame look matching with tone, palette, semantic-region, texture, identity, gamut, and cut protection.
+- **Buckswood Look DNA v2.1** - three-reference, spatial and five-frame look matching with native Browse / Load file pickers, tone, palette, semantic-region, texture, identity, gamut, and cut protection.
 
 The primary release target is DaVinci Resolve/OpenFX. Premiere Pro and Nuke builds are packaged as separate host downloads.
 

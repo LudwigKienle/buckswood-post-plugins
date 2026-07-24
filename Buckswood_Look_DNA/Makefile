@@ -13,12 +13,14 @@ PYTHON ?= python3
 ARCHFLAGS ?= -arch arm64 -arch x86_64
 CXXFLAGS := -std=c++17 -O3 -fvisibility=hidden -Wall -Wextra \
 	$(ARCHFLAGS) -Iinclude -I$(OFX_INCLUDE)
-FRAMEWORKS := -framework ImageIO -framework CoreGraphics -framework CoreFoundation
+FRAMEWORKS := -framework ImageIO -framework CoreGraphics -framework CoreFoundation \
+	-framework AppKit
 LDFLAGS_BUNDLE := -bundle $(FRAMEWORKS)
 
 CORE_SRC := src/LookDNACore.cpp
 LOADER_SRC := src/ReferenceImageLoader.cpp
 OFX_SRC := src/BuckswoodLookDNAOFX.cpp
+DIALOG_SRC := src/ReferenceFileDialog.mm
 
 .PHONY: all bundle smoketest descriptor-test loader-test companion-test install install-user clean check-toolchain
 
@@ -33,8 +35,8 @@ $(BUILD_DIR):
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
 
-$(BUILD_DIR)/$(OFX_BINARY): $(CORE_SRC) $(LOADER_SRC) $(OFX_SRC) | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS_BUNDLE) $(CORE_SRC) $(LOADER_SRC) $(OFX_SRC) -o $@
+$(BUILD_DIR)/$(OFX_BINARY): $(CORE_SRC) $(LOADER_SRC) $(OFX_SRC) $(DIALOG_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS_BUNDLE) $(CORE_SRC) $(LOADER_SRC) $(OFX_SRC) $(DIALOG_SRC) -o $@
 
 bundle: $(BUILD_DIR)/$(OFX_BINARY) | $(DIST_DIR)
 	rm -rf $(BUNDLE_DIR)

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "LookDNACore.h"
+#include "ReferenceFileDialog.h"
 #include "ReferenceImageLoader.h"
 
 #include "ofxImageEffect.h"
@@ -33,7 +34,7 @@ OfxParameterSuiteV1* gParamHost = nullptr;
 constexpr const char* kPluginIdentifier = "com.buckswood.look.dna";
 constexpr const char* kSourceFrameRangeProp = "OfxImageClipPropFrameRange_Source";
 constexpr int kPluginMajorVersion = 2;
-constexpr int kPluginMinorVersion = 0;
+constexpr int kPluginMinorVersion = 1;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -228,6 +229,18 @@ std::string stringParamAtTime(
         return fallback;
     }
     return value;
+}
+
+bool setStringParam(
+    OfxImageEffectHandle instance,
+    const char* name,
+    const std::string& value)
+{
+    OfxParamSetHandle paramSet = nullptr;
+    OfxParamHandle param = nullptr;
+    return gEffectHost->getParamSet(instance, &paramSet) == kOfxStatOK &&
+        gParamHost->paramGetHandle(paramSet, name, &param, nullptr) == kOfxStatOK &&
+        gParamHost->paramSetValue(param, value.c_str()) == kOfxStatOK;
 }
 
 buckswood_lookdna::Controls controlsAtTime(OfxImageEffectHandle instance, OfxTime time)
@@ -854,39 +867,42 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
 
     defineBooleanParam(paramSet, "enabled", "Enable Look Match", 1, 0, page);
     defineFileParam(paramSet, "referencePath", "Reference A / BWLOOK", 1, page);
-    defineFileParam(paramSet, "referencePathB", "Reference B (Optional)", 2, page);
-    defineFileParam(paramSet, "referencePathC", "Reference C (Optional)", 3, page);
-    defineButtonParam(paramSet, "refreshReference", "Refresh Reference Analysis", 4, page);
-    defineDoubleParam(paramSet, "referenceBMix", "Reference B Mix", 0.35, 0.0, 1.0, 5, page);
-    defineDoubleParam(paramSet, "referenceCMix", "Reference C Mix", 0.20, 0.0, 1.0, 6, page);
-    defineDoubleParam(paramSet, "referenceAdaptivity", "Auto Reference Balance", 0.70, 0.0, 1.0, 7, page);
-    defineChoiceParam(paramSet, "referenceSpace", "Reference Color Space", 2, colorSpaces, 9, 8, page);
-    defineChoiceParam(paramSet, "inputSpace", "Footage Color Space", 0, colorSpaces, 9, 9, page);
-    defineChoiceParam(paramSet, "analysisQuality", "Analysis Quality", 1, qualities, 3, 10, page);
-    defineChoiceParam(paramSet, "matchMode", "Match Mode", 0, modes, 4, 11, page);
-    defineDoubleParam(paramSet, "matchStrength", "Overall Match", 0.82, 0.0, 1.0, 12, page);
-    defineDoubleParam(paramSet, "toneMatch", "Tone & Contrast", 0.78, 0.0, 1.0, 13, page);
-    defineDoubleParam(paramSet, "paletteMatch", "Palette & Color Separation", 0.72, 0.0, 1.0, 14, page);
-    defineDoubleParam(paramSet, "densityMatch", "Color Density", 0.45, 0.0, 1.0, 15, page);
-    defineDoubleParam(paramSet, "semanticMatch", "Semantic Region Match", 0.62, 0.0, 1.0, 16, page);
-    defineDoubleParam(paramSet, "localContrastMatch", "Local Contrast Match", 0.42, 0.0, 1.0, 17, page);
-    defineDoubleParam(paramSet, "textureMatch", "Texture Match", 0.28, 0.0, 1.0, 18, page);
-    defineDoubleParam(paramSet, "grainMatch", "Reference Grain", 0.18, 0.0, 1.0, 19, page);
-    defineDoubleParam(paramSet, "shadowMatch", "Shadow Transfer", 0.82, 0.0, 1.0, 20, page);
-    defineDoubleParam(paramSet, "midtoneMatch", "Midtone Transfer", 1.0, 0.0, 1.0, 21, page);
-    defineDoubleParam(paramSet, "highlightMatch", "Highlight Transfer", 0.72, 0.0, 1.0, 22, page);
-    defineDoubleParam(paramSet, "exposureLock", "Preserve Footage Exposure", 0.35, 0.0, 1.0, 23, page);
-    defineDoubleParam(paramSet, "skinProtect", "Skin Identity Guard", 0.72, 0.0, 1.0, 24, page);
-    defineDoubleParam(paramSet, "highlightProtect", "Highlight Identity Guard", 0.74, 0.0, 1.0, 25, page);
-    defineDoubleParam(paramSet, "sceneIdentityGuard", "Scene Identity Guard", 0.70, 0.0, 1.0, 26, page);
-    defineDoubleParam(paramSet, "temporalStability", "Temporal Look Stability", 0.65, 0.0, 1.0, 27, page);
-    defineChoiceParam(paramSet, "temporalRadius", "Temporal Analysis", 2, temporalRadii, 3, 28, page);
-    defineDoubleParam(paramSet, "spatialMatch", "Spatial Look Map", 0.35, 0.0, 1.0, 29, page);
-    defineDoubleParam(paramSet, "gamutGuard", "Gamut Guard", 0.86, 0.0, 1.0, 30, page);
-    defineDoubleParam(paramSet, "splitPosition", "Split Position", 0.50, 0.0, 1.0, 31, page);
-    defineDoubleParam(paramSet, "outputMix", "Output Mix", 1.0, 0.0, 1.0, 32, page);
-    defineChoiceParam(paramSet, "viewMode", "View", 0, views, 12, 33, page);
-    defineBooleanParam(paramSet, "adjustmentLayerGuard", "Adjustment Layer Guard", 1, 34, page);
+    defineButtonParam(paramSet, "browseReferenceA", "Browse / Load Reference A...", 2, page);
+    defineFileParam(paramSet, "referencePathB", "Reference B (Optional)", 3, page);
+    defineButtonParam(paramSet, "browseReferenceB", "Browse / Load Reference B...", 4, page);
+    defineFileParam(paramSet, "referencePathC", "Reference C (Optional)", 5, page);
+    defineButtonParam(paramSet, "browseReferenceC", "Browse / Load Reference C...", 6, page);
+    defineButtonParam(paramSet, "refreshReference", "Refresh Reference Analysis", 7, page);
+    defineDoubleParam(paramSet, "referenceBMix", "Reference B Mix", 0.35, 0.0, 1.0, 8, page);
+    defineDoubleParam(paramSet, "referenceCMix", "Reference C Mix", 0.20, 0.0, 1.0, 9, page);
+    defineDoubleParam(paramSet, "referenceAdaptivity", "Auto Reference Balance", 0.70, 0.0, 1.0, 10, page);
+    defineChoiceParam(paramSet, "referenceSpace", "Reference Color Space", 2, colorSpaces, 9, 11, page);
+    defineChoiceParam(paramSet, "inputSpace", "Footage Color Space", 0, colorSpaces, 9, 12, page);
+    defineChoiceParam(paramSet, "analysisQuality", "Analysis Quality", 1, qualities, 3, 13, page);
+    defineChoiceParam(paramSet, "matchMode", "Match Mode", 0, modes, 4, 14, page);
+    defineDoubleParam(paramSet, "matchStrength", "Overall Match", 0.82, 0.0, 1.0, 15, page);
+    defineDoubleParam(paramSet, "toneMatch", "Tone & Contrast", 0.78, 0.0, 1.0, 16, page);
+    defineDoubleParam(paramSet, "paletteMatch", "Palette & Color Separation", 0.72, 0.0, 1.0, 17, page);
+    defineDoubleParam(paramSet, "densityMatch", "Color Density", 0.45, 0.0, 1.0, 18, page);
+    defineDoubleParam(paramSet, "semanticMatch", "Semantic Region Match", 0.62, 0.0, 1.0, 19, page);
+    defineDoubleParam(paramSet, "localContrastMatch", "Local Contrast Match", 0.42, 0.0, 1.0, 20, page);
+    defineDoubleParam(paramSet, "textureMatch", "Texture Match", 0.28, 0.0, 1.0, 21, page);
+    defineDoubleParam(paramSet, "grainMatch", "Reference Grain", 0.18, 0.0, 1.0, 22, page);
+    defineDoubleParam(paramSet, "shadowMatch", "Shadow Transfer", 0.82, 0.0, 1.0, 23, page);
+    defineDoubleParam(paramSet, "midtoneMatch", "Midtone Transfer", 1.0, 0.0, 1.0, 24, page);
+    defineDoubleParam(paramSet, "highlightMatch", "Highlight Transfer", 0.72, 0.0, 1.0, 25, page);
+    defineDoubleParam(paramSet, "exposureLock", "Preserve Footage Exposure", 0.35, 0.0, 1.0, 26, page);
+    defineDoubleParam(paramSet, "skinProtect", "Skin Identity Guard", 0.72, 0.0, 1.0, 27, page);
+    defineDoubleParam(paramSet, "highlightProtect", "Highlight Identity Guard", 0.74, 0.0, 1.0, 28, page);
+    defineDoubleParam(paramSet, "sceneIdentityGuard", "Scene Identity Guard", 0.70, 0.0, 1.0, 29, page);
+    defineDoubleParam(paramSet, "temporalStability", "Temporal Look Stability", 0.65, 0.0, 1.0, 30, page);
+    defineChoiceParam(paramSet, "temporalRadius", "Temporal Analysis", 2, temporalRadii, 3, 31, page);
+    defineDoubleParam(paramSet, "spatialMatch", "Spatial Look Map", 0.35, 0.0, 1.0, 32, page);
+    defineDoubleParam(paramSet, "gamutGuard", "Gamut Guard", 0.86, 0.0, 1.0, 33, page);
+    defineDoubleParam(paramSet, "splitPosition", "Split Position", 0.50, 0.0, 1.0, 34, page);
+    defineDoubleParam(paramSet, "outputMix", "Output Mix", 1.0, 0.0, 1.0, 35, page);
+    defineChoiceParam(paramSet, "viewMode", "View", 0, views, 12, 36, page);
+    defineBooleanParam(paramSet, "adjustmentLayerGuard", "Adjustment Layer Guard", 1, 37, page);
     return kOfxStatOK;
 }
 
@@ -899,7 +915,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(properties, kOfxImageEffectPropTemporalClipAccess, 0, 1);
     gPropHost->propSetString(properties, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(properties, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(properties, kOfxPropLabel, 0, "Buckswood Look DNA v2.0");
+    gPropHost->propSetString(properties, kOfxPropLabel, 0, "Buckswood Look DNA v2.1");
     gPropHost->propSetString(properties, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(properties, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
     return kOfxStatOK;
@@ -947,7 +963,9 @@ OfxStatus getFramesNeeded(
     return kOfxStatOK;
 }
 
-OfxStatus instanceChanged(OfxPropertySetHandle inArgs)
+OfxStatus instanceChanged(
+    OfxImageEffectHandle instance,
+    OfxPropertySetHandle inArgs)
 {
     if (!inArgs) {
         return kOfxStatReplyDefault;
@@ -955,6 +973,24 @@ OfxStatus instanceChanged(OfxPropertySetHandle inArgs)
     char* name = nullptr;
     if (gPropHost->propGetString(inArgs, kOfxPropName, 0, &name) != kOfxStatOK || !name) {
         return kOfxStatReplyDefault;
+    }
+    const char* targetReference = nullptr;
+    if (std::strcmp(name, "browseReferenceA") == 0) {
+        targetReference = "referencePath";
+    } else if (std::strcmp(name, "browseReferenceB") == 0) {
+        targetReference = "referencePathB";
+    } else if (std::strcmp(name, "browseReferenceC") == 0) {
+        targetReference = "referencePathC";
+    }
+    if (targetReference) {
+        const std::string initialPath =
+            stringParamAtTime(instance, targetReference, 0.0, "");
+        std::string selectedPath;
+        if (buckswood_lookdna::openReferenceFileDialog(initialPath, selectedPath) &&
+            setStringParam(instance, targetReference, selectedPath)) {
+            buckswood_lookdna::ReferenceImageLoader::clearCache();
+        }
+        return kOfxStatOK;
     }
     if (std::strcmp(name, "refreshReference") == 0 ||
         std::strcmp(name, "referencePath") == 0 ||
@@ -991,7 +1027,7 @@ OfxStatus pluginMain(
             return getFramesNeeded(effect, inArgs, outArgs);
         }
         if (std::strcmp(action, kOfxActionInstanceChanged) == 0) {
-            return instanceChanged(inArgs);
+            return instanceChanged(effect, inArgs);
         }
         if (std::strcmp(action, kOfxActionCreateInstance) == 0 ||
             std::strcmp(action, kOfxActionDestroyInstance) == 0) {
