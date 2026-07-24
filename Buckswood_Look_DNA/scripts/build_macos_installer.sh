@@ -5,9 +5,9 @@ export COPYFILE_DISABLE=1
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APP_NAME="Buckswood Look DNA v2.0"
+APP_NAME="Buckswood Look DNA v2.1"
 IDENTIFIER="com.buckswood.look.dna.installer"
-VERSION="2.0.0"
+VERSION="2.1.0"
 PLUGIN_BUNDLE="BuckswoodLookDNA.ofx.bundle"
 PKGROOT="$ROOT_DIR/packaging/pkgroot"
 PKG_SCRIPTS="$ROOT_DIR/packaging/scripts"

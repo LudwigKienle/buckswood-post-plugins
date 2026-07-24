@@ -1,4 +1,4 @@
-# Buckswood Look DNA v2.0
+# Buckswood Look DNA v2.1
 
 Reference-still look matching for OpenFX hosts. Look DNA analyzes the tonal,
 chromatic, local-contrast, texture, and broad semantic character of a reference
@@ -10,7 +10,8 @@ or scene content from the reference.
 
 ## Highlights
 
-- Direct JPEG, PNG, and TIFF reference loading on macOS and Windows
+- Native Browse / Load buttons for all three reference slots in DaVinci Resolve
+- Direct JPEG, PNG, TIFF, BMP, and BWLOOK loading on macOS and Windows
 - Three-reference DNA blending with automatic shot compatibility weighting
 - Overlapping 3x3 spatial look maps for location-sensitive transfer without hard seams
 - Five-frame cut-aware analysis with selectable off, three-frame, and five-frame modes
@@ -54,6 +55,11 @@ python3 scripts/analyze_reference.py reference.jpg reference.bwlook \
 ```
 
 No network service or cloud upload is used.
+
+In DaVinci Resolve, click `Browse / Load Reference A...` directly below the
+reference path. The operating-system file chooser writes the selected local file
+into the path field automatically. The same workflow is available for optional
+references B and C. Files stay on the workstation and are never uploaded.
 
 ## Documentation
 

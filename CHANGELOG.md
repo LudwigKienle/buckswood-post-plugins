@@ -1,5 +1,14 @@
 # Changelog
 
+## Look DNA v2.1.0 - 2026-07-24
+
+- Added native Browse / Load buttons for reference slots A, B, and C in
+  DaVinci Resolve and other OpenFX hosts.
+- Added platform file pickers for JPEG, PNG, TIFF, BMP, and BWLOOK references on
+  macOS and Windows; selected paths are applied and reanalyzed automatically.
+- Rebuilt the universal macOS installer and Win64 package, with Apple
+  notarization for both the standalone PKG and DMG.
+
 ## v2.2.0 - 2026-07-15
 
 - Expanded the native Premiere Pro package from two to all eight Buckswood effects.

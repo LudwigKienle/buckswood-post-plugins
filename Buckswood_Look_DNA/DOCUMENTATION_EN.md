@@ -1,4 +1,4 @@
-# Buckswood Look DNA v2.0
+# Buckswood Look DNA v2.1
 
 ## What It Does
 
@@ -21,8 +21,9 @@ type. The plug-in then matches the look while the source shot remains itself.
 
 1. Place Look DNA after technical input transforms and primary exposure balance,
    but before final grain and output sharpening.
-2. Choose `Reference A / BWLOOK` and load the main JPEG, PNG, TIFF, or `.bwlook`.
-   Add Reference B or C only when they belong to the same intended look family.
+2. Click `Browse / Load Reference A...` below `Reference A / BWLOOK`, then choose
+   the main reference in the macOS or Windows file picker. Add Reference B or C
+   only when they belong to the same intended look family.
 3. Set `Reference Color Space` and `Footage Color Space` correctly.
 4. Start with `Analysis Quality: High` and `Match Mode: Full Look`.
 5. Inspect `View: Match Confidence`, then return to `Matched Result`.
@@ -57,6 +58,12 @@ type. The plug-in then matches the look while the source shot remains itself.
 optional supporting stills. Their mix sliders define the maximum contribution;
 `Auto Reference Balance` then reduces a still when its exposure, contrast,
 palette, or semantic distribution is incompatible with the current shot.
+
+`Browse / Load Reference A/B/C...` opens the native file picker for JPEG, PNG,
+TIFF, BMP, and `.bwlook` files. The selected local path is written to the
+matching reference field and reanalyzed automatically. Nothing is uploaded to a
+cloud service. If a Resolve project moves to another workstation, reselect any
+reference whose local path is unavailable there.
 
 `Spatial Look Map` blends nine overlapping regional analyses. Keep it moderate:
 it should preserve local lighting relationships, not copy the reference layout.

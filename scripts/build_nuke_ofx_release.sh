@@ -70,7 +70,7 @@ Included OFX plug-ins:
 - Buckswood Frame Director v2.0
 - Buckswood Radiance Recover v2.0
 - Buckswood Temporal Integrity v2.0
-- Buckswood Look DNA v2.0
+- Buckswood Look DNA v2.1
 
 Nuke can load OpenFX plug-ins directly. This package is experimental because
 the plug-ins are primarily tested in DaVinci Resolve first.

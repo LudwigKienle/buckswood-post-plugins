@@ -20,7 +20,7 @@ Included tools:
 - Buckswood Frame Director v2.0
 - Buckswood Radiance Recover v2.0
 - Buckswood Temporal Integrity v2.0
-- Buckswood Look DNA v2.0
+- Buckswood Look DNA v2.1
 
 Additional standalone macOS assets:
 
@@ -49,7 +49,7 @@ Included tools:
 - Buckswood Lens Physics v0.4
 - Buckswood AI Photorealizer v0.2
 - Buckswood Film Emulation v2.0
-- Buckswood Look DNA v2.0
+- Buckswood Look DNA v2.1
 
 Temporal modes in Fake Diagnostic depend on host frame access. If temporal access is limited in Nuke, use the spatial diagnostic modes first.
 

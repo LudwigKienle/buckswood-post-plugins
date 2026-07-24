@@ -39,6 +39,7 @@ int main(int argc, char** argv)
     require(plugin->pluginIdentifier != nullptr, "plugin identifier exists");
     require(std::strcmp(plugin->pluginIdentifier, "com.buckswood.look.dna") == 0, "plugin identifier matches");
     require(plugin->pluginVersionMajor == 2, "plugin exposes v2 major version");
+    require(plugin->pluginVersionMinor == 1, "plugin exposes v2.1 minor version");
     require(plugin->mainEntry != nullptr, "plugin main entry exists");
     require(getPlugin(1) == nullptr, "out-of-range descriptor is null");
     dlclose(library);

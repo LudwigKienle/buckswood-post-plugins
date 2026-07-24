@@ -1,13 +1,14 @@
-Buckswood Look DNA v2.0
+Buckswood Look DNA v2.1
 =======================
 
 1. Quit DaVinci Resolve or Nuke.
 2. Open Buckswood_Look_DNA_v2_Installer.pkg.
 3. Complete the installer.
 4. Restart the host.
-5. Find Buckswood Look DNA v2.0 in OpenFX > Buckswood.
+5. Find Buckswood Look DNA v2.1 in OpenFX > Buckswood.
 
-Load the main still under Reference A / BWLOOK. Reference B and C are optional.
+Click Browse / Load Reference A to choose the main still without typing a path.
+Reference B and C are optional and have their own Browse / Load buttons.
 Read DOCUMENTATION_EN.md or DOCUMENTATION_DE.md for color-space setup and safe
 starting values.
 

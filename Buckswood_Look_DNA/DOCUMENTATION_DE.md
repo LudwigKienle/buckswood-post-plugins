@@ -1,4 +1,4 @@
-# Buckswood Look DNA v2.0
+# Buckswood Look DNA v2.1
 
 ## Was Das Plugin Macht
 
@@ -20,8 +20,10 @@ und Motivart. Der Shot behaelt dadurch seine Identitaet.
 
 1. Setze Look DNA nach technischem Input-Transform und primaerer
    Belichtungskorrektur, aber vor finalem Grain und Output-Sharpening.
-2. Lade unter `Reference A / BWLOOK` die Hauptreferenz. Reference B und C sind
-   optional und sollten zur gleichen Look-Familie gehoeren.
+2. Klicke unter `Reference A / BWLOOK` auf
+   `Browse / Load Reference A...` und waehle die Hauptreferenz im macOS- oder
+   Windows-Dateidialog. Reference B und C sind optional und sollten zur gleichen
+   Look-Familie gehoeren.
 3. Stelle Referenz- und Footage-Farbraum korrekt ein.
 4. Starte mit `Analysis Quality: High` und `Match Mode: Full Look`.
 5. Pruefe zuerst `View: Match Confidence` und gehe dann zu `Matched Result`.
@@ -64,6 +66,13 @@ Startpunkt. Vor einem CST kann der passende Kamera-Log-Farbraum gewaehlt werden.
 Ergaenzungen. Die Mix-Regler bestimmen ihren Maximalanteil. `Auto Reference
 Balance` reduziert automatisch eine Referenz, deren Belichtung, Kontrast,
 Palette oder Motive statistisch schlecht zum aktuellen Shot passen.
+
+`Browse / Load Reference A/B/C...` oeffnet den nativen Dateidialog. Unterstuetzt
+werden JPEG, PNG, TIFF, BMP und `.bwlook`. Der ausgewaehlte lokale Pfad wird
+automatisch in das zugehoerige Referenzfeld geschrieben und sofort neu
+analysiert. Es findet kein Cloud-Upload statt. Wird ein Resolve-Projekt auf
+einen anderen Rechner verschoben, muss eine dort fehlende Referenz neu
+ausgewaehlt werden.
 
 `Spatial Look Map` mischt neun ueberlappende Regionen weich. Moderate Werte
 erhalten lokale Lichtverhaeltnisse, ohne das Layout der Referenz zu kopieren.
