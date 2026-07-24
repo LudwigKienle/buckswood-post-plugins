@@ -46,15 +46,6 @@ public:
 
 class LensPhysicsCore {
 public:
-    template <typename SamplerT>
-    static Pixel processPixel(
-        const SamplerT& sampler,
-        int x,
-        int y,
-        const FrameInfo& frame,
-        const Controls& controls);
-
-private:
     struct LensModel {
         float distortion;
         float chromaticAberration;
@@ -69,6 +60,38 @@ private:
         float blueBias;
     };
 
+    struct PreparedState {
+        LensModel model;
+        Controls controls;
+        float rawOverdrive;
+        float baseOverdrive;
+        float width;
+        float height;
+        float centerX;
+        float centerY;
+        float aspect;
+    };
+
+    static PreparedState prepare(
+        const FrameInfo& frame,
+        const Controls& controls);
+
+    template <typename SamplerT>
+    static Pixel processPixel(
+        const SamplerT& sampler,
+        int x,
+        int y,
+        const FrameInfo& frame,
+        const Controls& controls);
+
+    template <typename SamplerT>
+    static Pixel processPixel(
+        const SamplerT& sampler,
+        int x,
+        int y,
+        const PreparedState& state);
+
+private:
     static LensModel modelForPreset(int preset);
 
     static float clamp01(float value)
@@ -140,30 +163,26 @@ Pixel LensPhysicsCore::processPixel(
     const FrameInfo& frame,
     const Controls& controls)
 {
+    return processPixel(sampler, x, y, prepare(frame, controls));
+}
+
+template <typename SamplerT>
+Pixel LensPhysicsCore::processPixel(
+    const SamplerT& sampler,
+    int x,
+    int y,
+    const PreparedState& state)
+{
     const Pixel dry = sampler.sample(static_cast<float>(x), static_cast<float>(y));
-    LensModel model = modelForPreset(controls.lensPreset);
-    const float lensAmount = clamp01(controls.effectStrength) * clamp01(controls.outputMix);
-    const float rawOverdrive = std::max(0.0f, controls.overdrive);
-    const float baseOd = rawOverdrive * lensAmount;
-
-    model.distortion += controls.distortion * 0.18f;
-    model.chromaticAberration += controls.chromaticAberration;
-    model.fringing += controls.fringing;
-    model.coma += controls.coma;
-    model.bloom += controls.bloom;
-    model.vignette += controls.vignette;
-    model.cornerColor += controls.cornerColor;
-    model.swirl += controls.swirl;
-    model.sharpener += controls.fStopSharpener;
-
-    const float width = static_cast<float>(std::max(1, frame.width));
-    const float height = static_cast<float>(std::max(1, frame.height));
-    const float cx = (width - 1.0f) * 0.5f;
-    const float cy = (height - 1.0f) * 0.5f;
-    const float aspect = safeDiv(width, height);
+    const LensModel& model = state.model;
+    const Controls& controls = state.controls;
+    const float rawOverdrive = state.rawOverdrive;
+    const float baseOd = state.baseOverdrive;
+    const float cx = state.centerX;
+    const float cy = state.centerY;
     const float nx = safeDiv(static_cast<float>(x) - cx, cx);
     const float ny = safeDiv(static_cast<float>(y) - cy, cy);
-    const float ax = nx * aspect;
+    const float ax = nx * state.aspect;
     const float radius = std::sqrt(ax * ax + ny * ny);
     const float edge = smoothstep(0.18f, 1.18f, radius);
 

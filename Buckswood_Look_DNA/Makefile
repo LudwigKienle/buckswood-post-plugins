@@ -12,7 +12,7 @@ CXX ?= clang++
 PYTHON ?= python3
 ARCHFLAGS ?= -arch arm64 -arch x86_64
 CXXFLAGS := -std=c++17 -O3 -fvisibility=hidden -Wall -Wextra \
-	$(ARCHFLAGS) -Iinclude -I$(OFX_INCLUDE)
+	$(ARCHFLAGS) -Iinclude -I$(ROOT_DIR)/shared -I$(OFX_INCLUDE)
 FRAMEWORKS := -framework ImageIO -framework CoreGraphics -framework CoreFoundation \
 	-framework AppKit
 LDFLAGS_BUNDLE := -bundle $(FRAMEWORKS)

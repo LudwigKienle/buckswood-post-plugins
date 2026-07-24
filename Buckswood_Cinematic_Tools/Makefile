@@ -12,7 +12,7 @@ CXX ?= clang++
 PYTHON ?= python3
 ARCHFLAGS ?= -arch arm64 -arch x86_64
 CXXFLAGS := -std=c++17 -O3 -fvisibility=hidden -Wall -Wextra \
-	$(ARCHFLAGS) -Iinclude -I$(OFX_INCLUDE)
+	$(ARCHFLAGS) -Iinclude -I$(ROOT_DIR)/shared -I$(OFX_INCLUDE)
 LDFLAGS_BUNDLE := -bundle
 
 CORE_SRC := src/CinematicToolsCore.cpp

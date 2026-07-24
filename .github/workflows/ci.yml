@@ -19,6 +19,13 @@ jobs:
           make -C Buckswood_Fake_Diagnostic smoketest
           make -C Buckswood_Lens_Physics smoketest
           make -C Buckswood_AI_Photorealizer smoketest
+          make -C Buckswood_Lens_Physics metaltest
+          make -C Buckswood_AI_Photorealizer metaltest
+
+      - name: Validate OpenCL kernels
+        run: |
+          perl -0777 -ne 'print $1 if /R"OPENCL\((.*?)\)OPENCL"/s' Buckswood_Lens_Physics/src/LensPhysicsOpenCL.cpp | clang -x cl -cl-std=CL1.2 -fsyntax-only -
+          perl -0777 -ne 'print $1 if /R"OPENCL\((.*?)\)OPENCL"/s' Buckswood_AI_Photorealizer/src/PhotorealizerOpenCL.cpp | clang -x cl -cl-std=CL1.2 -fsyntax-only -
 
       - name: Build macOS OFX bundles
         run: |

@@ -14,8 +14,8 @@ Release assets:
 Included tools:
 
 - Buckswood Fake Diagnostic v2.1
-- Buckswood Lens Physics v0.4 Overdrive Edge Guard
-- Buckswood AI Photorealizer v0.2
+- Buckswood Lens Physics v0.5 GPU Performance
+- Buckswood AI Photorealizer v0.3 GPU Performance
 - Buckswood Film Emulation v2.0
 - Buckswood Frame Director v2.0
 - Buckswood Radiance Recover v2.0
@@ -46,8 +46,8 @@ Nuke can load OpenFX plug-ins directly, so this package reuses the same OFX core
 Included tools:
 
 - Buckswood Fake Diagnostic v2.1
-- Buckswood Lens Physics v0.4
-- Buckswood AI Photorealizer v0.2
+- Buckswood Lens Physics v0.5
+- Buckswood AI Photorealizer v0.3
 - Buckswood Film Emulation v2.0
 - Buckswood Look DNA v2.1
 

@@ -32,8 +32,8 @@ Color Page > DCTL > Buckswood_AI_Photorealizer_v01
 Included OFX versions:
 
 Buckswood Fake Diagnostic v2.1
-Buckswood Lens Physics v0.4 Overdrive Edge Guard
-Buckswood AI Photorealizer v0.2
+Buckswood Lens Physics v0.5 Metal/OpenCL Performance
+Buckswood AI Photorealizer v0.3 Metal/OpenCL Performance
 Buckswood Film Emulation v2.0
 Buckswood Frame Director v2.0
 Buckswood Radiance Recover v2.0
@@ -59,3 +59,10 @@ Note:
 
 This Windows installer is not Authenticode-signed yet. Windows SmartScreen may
 warn because Windows code-signing needs a separate Windows-compatible certificate.
+
+GPU acceleration:
+
+Lens Physics v0.5 and AI Photorealizer v0.3 use Resolve's OpenCL buffer path
+on compatible NVIDIA and AMD drivers. Float32 processing and the full-quality
+sampling pipeline are preserved. If Resolve does not enable OpenCL, the plugins
+automatically use Resolve's host-managed CPU thread pool.

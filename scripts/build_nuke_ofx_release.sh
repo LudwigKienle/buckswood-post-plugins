@@ -64,8 +64,8 @@ Buckswood OFX for Nuke v2
 Included OFX plug-ins:
 
 - Buckswood Fake Diagnostic v2.1
-- Buckswood Lens Physics v0.4 Overdrive Edge Guard
-- Buckswood AI Photorealizer v0.2
+- Buckswood Lens Physics v0.5 GPU Performance
+- Buckswood AI Photorealizer v0.3 GPU Performance
 - Buckswood Film Emulation v2.0
 - Buckswood Frame Director v2.0
 - Buckswood Radiance Recover v2.0

@@ -12,12 +12,12 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Buckswood Lens Physics v0.4</string>
+  <string>Buckswood Lens Physics v0.5</string>
   <key>CFBundlePackageType</key>
   <string>BNDL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.4.0</string>
+  <string>0.5.0</string>
   <key>CFBundleVersion</key>
-  <string>0.4.0</string>
+  <string>0.5.0</string>
 </dict>
 </plist>

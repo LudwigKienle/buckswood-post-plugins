@@ -5,9 +5,9 @@ export COPYFILE_DISABLE=1
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APP_NAME="Buckswood AI Photorealizer v0.2"
+APP_NAME="Buckswood AI Photorealizer v0.3"
 IDENTIFIER="com.buckswood.ai.photorealizer.installer"
-VERSION="0.2.0"
+VERSION="0.3.0"
 PLUGIN_BUNDLE="BuckswoodAIPhotorealizer.ofx.bundle"
 PKGROOT="$ROOT_DIR/packaging/pkgroot"
 PKG_SCRIPTS="$ROOT_DIR/packaging/scripts"

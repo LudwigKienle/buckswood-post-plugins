@@ -2,12 +2,19 @@
 #include <cstring>
 #include <exception>
 #include <new>
-#include <thread>
 #include <type_traits>
-#include <vector>
 
 #include "PhotorealizerCore.h"
+#include "GpuRenderTypes.h"
+#if defined(__APPLE__)
+#include "PhotorealizerMetal.h"
+#endif
+#if defined(_WIN32)
+#include "PhotorealizerOpenCL.h"
+#endif
+#include "OfxRenderRuntime.h"
 
+#include "ofxGPURender.h"
 #include "ofxImageEffect.h"
 #include "ofxMemory.h"
 #include "ofxMultiThread.h"
@@ -28,10 +35,11 @@ OfxHost* gHost = nullptr;
 OfxImageEffectSuiteV1* gEffectHost = nullptr;
 OfxPropertySuiteV1* gPropHost = nullptr;
 OfxParameterSuiteV1* gParamHost = nullptr;
+OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.ai.photorealizer";
 constexpr int kPluginMajorVersion = 0;
-constexpr int kPluginMinorVersion = 2;
+constexpr int kPluginMinorVersion = 3;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -56,6 +64,26 @@ bool readImageInfo(OfxPropertySetHandle image, ImageInfo& info)
            gPropHost->propGetInt(image, kOfxImagePropRowBytes, 0, &info.rowBytes) == kOfxStatOK &&
            gPropHost->propGetIntN(image, kOfxImagePropBounds, 4, &info.bounds.x1) == kOfxStatOK &&
            gPropHost->propGetString(image, kOfxImageEffectPropPixelDepth, 0, &info.pixelDepth) == kOfxStatOK;
+}
+
+buckswood::gpu::PixelFormat gpuPixelFormat(const char* pixelDepth)
+{
+    return std::strcmp(pixelDepth, kOfxBitDepthFloat) == 0
+        ? buckswood::gpu::PixelFormat::Float32
+        : buckswood::gpu::PixelFormat::Byte;
+}
+
+buckswood::gpu::ImageBuffer gpuImageBuffer(const ImageInfo& info)
+{
+    return buckswood::gpu::ImageBuffer{
+        info.data,
+        info.rowBytes,
+        info.bounds.x1,
+        info.bounds.y1,
+        info.bounds.x2,
+        info.bounds.y2,
+        gpuPixelFormat(info.pixelDepth),
+    };
 }
 
 double paramAtTime(OfxImageEffectHandle instance, const char* name, OfxTime time, double fallback)
@@ -220,36 +248,6 @@ bool sourceLooksLikeBlankAdjustmentByDepth(const ImageInfo& srcInfo)
     return false;
 }
 
-// Runs rowFn over contiguous bands of rows, one band per thread; every
-// thread writes disjoint rows, so the output is identical to a serial loop.
-template <typename RowRangeFn>
-void parallelRows(const OfxRectI& renderWindow, const RowRangeFn& rowFn)
-{
-    const int rowCount = renderWindow.y2 - renderWindow.y1;
-    const unsigned threadCount = std::min<unsigned>(
-        std::max(1u, std::thread::hardware_concurrency()),
-        static_cast<unsigned>(std::max(1, rowCount)));
-    if (threadCount <= 1) {
-        rowFn(renderWindow.y1, renderWindow.y2);
-        return;
-    }
-
-    const int rowsPerBand = (rowCount + static_cast<int>(threadCount) - 1) / static_cast<int>(threadCount);
-    std::vector<std::thread> workers;
-    workers.reserve(threadCount);
-    for (unsigned t = 0; t < threadCount; ++t) {
-        const int yBegin = renderWindow.y1 + static_cast<int>(t) * rowsPerBand;
-        const int yEnd = std::min(renderWindow.y2, yBegin + rowsPerBand);
-        if (yBegin >= yEnd) {
-            break;
-        }
-        workers.emplace_back(rowFn, yBegin, yEnd);
-    }
-    for (auto& worker : workers) {
-        worker.join();
-    }
-}
-
 OfxStatus renderFloat(
     OfxImageEffectHandle instance,
     const OfxRectI& renderWindow,
@@ -261,7 +259,7 @@ OfxStatus renderFloat(
     auto* src = reinterpret_cast<OfxRGBAColourF*>(srcInfo.data);
     auto* dst = reinterpret_cast<OfxRGBAColourF*>(dstInfo.data);
 
-    parallelRows(renderWindow, [&](int yBegin, int yEnd) {
+    const auto renderRows = [&](int yBegin, int yEnd) {
         for (int y = yBegin; y < yEnd; ++y) {
             if (gEffectHost->abort(instance)) {
                 break;
@@ -285,8 +283,12 @@ OfxStatus renderFloat(
                 }
             }
         }
-    });
-    return kOfxStatOK;
+    };
+    return buckswood::ofx_runtime::parallelRows(
+        gThreadHost,
+        renderWindow.y1,
+        renderWindow.y2,
+        renderRows);
 }
 
 OfxStatus renderByte(
@@ -300,35 +302,41 @@ OfxStatus renderByte(
     auto* src = reinterpret_cast<OfxRGBAColourB*>(srcInfo.data);
     auto* dst = reinterpret_cast<OfxRGBAColourB*>(dstInfo.data);
 
-    for (int y = renderWindow.y1; y < renderWindow.y2; ++y) {
-        if (gEffectHost->abort(instance)) {
-            break;
-        }
+    const auto renderRows = [&](int yBegin, int yEnd) {
+        for (int y = yBegin; y < yEnd; ++y) {
+            if (gEffectHost->abort(instance)) {
+                break;
+            }
 
-        auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
-        for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
-            auto* srcPix = pixelAddress(src, srcInfo.bounds, x, y, srcInfo.rowBytes);
-            if (srcPix && dstPix) {
-                buckswood::Pixel in{
-                    srcPix->r / 255.0f,
-                    srcPix->g / 255.0f,
-                    srcPix->b / 255.0f,
-                    srcPix->a / 255.0f,
-                };
-                buckswood::Pixel out = buckswood::PhotorealizerCore::processPixel(in, x, y, frame, controls);
-                dstPix->r = toByte(out.r);
-                dstPix->g = toByte(out.g);
-                dstPix->b = toByte(out.b);
-                dstPix->a = toByte(out.a);
-            } else if (dstPix) {
-                *dstPix = OfxRGBAColourB{0, 0, 0, 0};
-            }
-            if (dstPix) {
-                ++dstPix;
+            auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
+            for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
+                auto* srcPix = pixelAddress(src, srcInfo.bounds, x, y, srcInfo.rowBytes);
+                if (srcPix && dstPix) {
+                    buckswood::Pixel in{
+                        srcPix->r / 255.0f,
+                        srcPix->g / 255.0f,
+                        srcPix->b / 255.0f,
+                        srcPix->a / 255.0f,
+                    };
+                    buckswood::Pixel out = buckswood::PhotorealizerCore::processPixel(in, x, y, frame, controls);
+                    dstPix->r = toByte(out.r);
+                    dstPix->g = toByte(out.g);
+                    dstPix->b = toByte(out.b);
+                    dstPix->a = toByte(out.a);
+                } else if (dstPix) {
+                    *dstPix = OfxRGBAColourB{0, 0, 0, 0};
+                }
+                if (dstPix) {
+                    ++dstPix;
+                }
             }
         }
-    }
-    return kOfxStatOK;
+    };
+    return buckswood::ofx_runtime::parallelRows(
+        gThreadHost,
+        renderWindow.y1,
+        renderWindow.y2,
+        renderRows);
 }
 
 class NoImageEx {};
@@ -339,6 +347,38 @@ OfxStatus render(OfxImageEffectHandle instance, OfxPropertySetHandle inArgs)
     OfxRectI renderWindow{0, 0, 0, 0};
     gPropHost->propGetDouble(inArgs, kOfxPropTime, 0, &time);
     gPropHost->propGetIntN(inArgs, kOfxImageEffectPropRenderWindow, 4, &renderWindow.x1);
+#if defined(__APPLE__)
+    int metalEnabled = 0;
+    void* metalCommandQueue = nullptr;
+    gPropHost->propGetInt(inArgs, kOfxImageEffectPropMetalEnabled, 0, &metalEnabled);
+    if (metalEnabled) {
+        gPropHost->propGetPointer(
+            inArgs,
+            kOfxImageEffectPropMetalCommandQueue,
+            0,
+            &metalCommandQueue);
+    }
+#endif
+#if defined(_WIN32)
+    int openCLEnabled = 0;
+    void* openCLCommandQueue = nullptr;
+    gPropHost->propGetInt(inArgs, kOfxImageEffectPropOpenCLEnabled, 0, &openCLEnabled);
+    if (openCLEnabled) {
+        gPropHost->propGetPointer(
+            inArgs,
+            kOfxImageEffectPropOpenCLCommandQueue,
+            0,
+            &openCLCommandQueue);
+    }
+#endif
+    const bool gpuRenderEnabled =
+#if defined(__APPLE__)
+        metalEnabled != 0 ||
+#endif
+#if defined(_WIN32)
+        openCLEnabled != 0 ||
+#endif
+        false;
 
     OfxImageClipHandle outputClip = nullptr;
     OfxImageClipHandle sourceClip = nullptr;
@@ -360,7 +400,9 @@ OfxStatus render(OfxImageEffectHandle instance, OfxPropertySetHandle inArgs)
         }
 
         if (gEffectHost->clipGetImage(sourceClip, time, nullptr, &sourceImage) != kOfxStatOK) {
-            status = fillTransparentByDepth(instance, renderWindow, dstInfo);
+            status = gpuRenderEnabled
+                ? kOfxStatFailed
+                : fillTransparentByDepth(instance, renderWindow, dstInfo);
         } else {
             ImageInfo srcInfo;
             if (!readImageInfo(sourceImage, srcInfo)) {
@@ -368,6 +410,54 @@ OfxStatus render(OfxImageEffectHandle instance, OfxPropertySetHandle inArgs)
             }
 
             const int adjustmentLayerGuard = intParamAtTime(instance, "adjustmentLayerGuard", time, 1);
+#if defined(_WIN32)
+            if (openCLEnabled) {
+                buckswood::FrameInfo frame{
+                    dstInfo.bounds.x2 - dstInfo.bounds.x1,
+                    dstInfo.bounds.y2 - dstInfo.bounds.y1,
+                    static_cast<int>(time),
+                };
+                const buckswood::Controls controls = controlsAtTime(instance, time);
+                const bool queued = buckswood::runPhotorealizerOpenCL(
+                    openCLCommandQueue,
+                    gpuImageBuffer(srcInfo),
+                    gpuImageBuffer(dstInfo),
+                    buckswood::gpu::RenderWindow{
+                        renderWindow.x1,
+                        renderWindow.y1,
+                        renderWindow.x2,
+                        renderWindow.y2,
+                    },
+                    frame,
+                    controls,
+                    adjustmentLayerGuard != 0);
+                status = queued ? kOfxStatOK : kOfxStatFailed;
+            } else
+#endif
+#if defined(__APPLE__)
+            if (metalEnabled) {
+                buckswood::FrameInfo frame{
+                    dstInfo.bounds.x2 - dstInfo.bounds.x1,
+                    dstInfo.bounds.y2 - dstInfo.bounds.y1,
+                    static_cast<int>(time),
+                };
+                const buckswood::Controls controls = controlsAtTime(instance, time);
+                const bool queued = buckswood::runPhotorealizerMetal(
+                    metalCommandQueue,
+                    gpuImageBuffer(srcInfo),
+                    gpuImageBuffer(dstInfo),
+                    buckswood::gpu::RenderWindow{
+                        renderWindow.x1,
+                        renderWindow.y1,
+                        renderWindow.x2,
+                        renderWindow.y2,
+                    },
+                    frame,
+                    controls,
+                    adjustmentLayerGuard != 0);
+                status = queued ? kOfxStatOK : kOfxStatFailed;
+            } else
+#endif
             if (adjustmentLayerGuard && sourceLooksLikeBlankAdjustmentByDepth(srcInfo)) {
                 status = fillTransparentByDepth(instance, renderWindow, dstInfo);
             } else {
@@ -480,9 +570,15 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(effectProps, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood AI Photorealizer v0.2");
+    gPropHost->propSetString(effectProps, kOfxPropLabel, 0, "Buckswood AI Photorealizer v0.3");
     gPropHost->propSetString(effectProps, kOfxImageEffectPluginPropGrouping, 0, "Buckswood AI");
     gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
+#if defined(__APPLE__)
+    gPropHost->propSetString(effectProps, kOfxImageEffectPropMetalRenderSupported, 0, "true");
+#endif
+#if defined(_WIN32)
+    gPropHost->propSetString(effectProps, kOfxImageEffectPropOpenCLRenderSupported, 0, "true");
+#endif
     return kOfxStatOK;
 }
 
@@ -497,6 +593,8 @@ OfxStatus onLoad()
         reinterpret_cast<const OfxPropertySuiteV1*>(gHost->fetchSuite(gHost->host, kOfxPropertySuite, 1)));
     gParamHost = const_cast<OfxParameterSuiteV1*>(
         reinterpret_cast<const OfxParameterSuiteV1*>(gHost->fetchSuite(gHost->host, kOfxParameterSuite, 1)));
+    gThreadHost = const_cast<OfxMultiThreadSuiteV1*>(
+        reinterpret_cast<const OfxMultiThreadSuiteV1*>(gHost->fetchSuite(gHost->host, kOfxMultiThreadSuite, 1)));
     if (!gEffectHost || !gPropHost || !gParamHost) {
         return kOfxStatErrMissingHostFeature;
     }

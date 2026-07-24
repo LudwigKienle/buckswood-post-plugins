@@ -9,11 +9,10 @@
 #include <new>
 #include <sstream>
 #include <string>
-#include <thread>
 #include <type_traits>
-#include <vector>
 
 #include "CinematicToolsCore.h"
+#include "OfxRenderRuntime.h"
 
 #include "ofxImageEffect.h"
 #include "ofxParam.h"
@@ -39,6 +38,7 @@ OfxHost* gHost = nullptr;
 OfxImageEffectSuiteV1* gEffectHost = nullptr;
 OfxPropertySuiteV1* gPropHost = nullptr;
 OfxParameterSuiteV1* gParamHost = nullptr;
+OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kSourceFrameRangeProp = "OfxImageClipPropFrameRange_Source";
 constexpr int kPluginMajorVersion = 2;
@@ -682,30 +682,11 @@ OfxStatus renderTyped(
         }
     };
 
-    const int rowCount = std::max(1, renderWindow.y2 - renderWindow.y1);
-    const unsigned threadCount = std::min<unsigned>(
-        std::max(1u, std::thread::hardware_concurrency()),
-        static_cast<unsigned>(rowCount));
-    if (threadCount <= 1) {
-        renderRows(renderWindow.y1, renderWindow.y2);
-        return kOfxStatOK;
-    }
-
-    const int rowsPerThread =
-        (rowCount + static_cast<int>(threadCount) - 1) / static_cast<int>(threadCount);
-    std::vector<std::thread> workers;
-    workers.reserve(threadCount);
-    for (unsigned index = 0; index < threadCount; ++index) {
-        const int firstY = renderWindow.y1 + static_cast<int>(index) * rowsPerThread;
-        const int lastY = std::min(renderWindow.y2, firstY + rowsPerThread);
-        if (firstY < lastY) {
-            workers.emplace_back(renderRows, firstY, lastY);
-        }
-    }
-    for (auto& worker : workers) {
-        worker.join();
-    }
-    return kOfxStatOK;
+    return buckswood::ofx_runtime::parallelRows(
+        gThreadHost,
+        renderWindow.y1,
+        renderWindow.y2,
+        renderRows);
 }
 
 class NoImageException {};
@@ -1072,6 +1053,9 @@ OfxStatus onLoad()
     gParamHost = const_cast<OfxParameterSuiteV1*>(
         reinterpret_cast<const OfxParameterSuiteV1*>(
             gHost->fetchSuite(gHost->host, kOfxParameterSuite, 1)));
+    gThreadHost = const_cast<OfxMultiThreadSuiteV1*>(
+        reinterpret_cast<const OfxMultiThreadSuiteV1*>(
+            gHost->fetchSuite(gHost->host, kOfxMultiThreadSuite, 1)));
     return gEffectHost && gPropHost && gParamHost ? kOfxStatOK : kOfxStatErrMissingHostFeature;
 }
 

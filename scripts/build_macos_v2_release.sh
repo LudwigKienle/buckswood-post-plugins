@@ -27,8 +27,8 @@ can_notarize() {
 
 declare -a SRC_PKGS=(
     "Buckswood_Fake_Diagnostic/release/Buckswood_Fake_Diagnostic_Installer.pkg|Buckswood_Fake_Diagnostic_v2.1_Installer.pkg"
-    "Buckswood_AI_Photorealizer/release/Buckswood_AI_Photorealizer_Installer.pkg|Buckswood_AI_Photorealizer_v0.2_Installer.pkg"
-    "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer.pkg|Buckswood_Lens_Physics_v0.4_Overdrive_Edge_Guard_Installer.pkg"
+    "Buckswood_AI_Photorealizer/release/Buckswood_AI_Photorealizer_Installer.pkg|Buckswood_AI_Photorealizer_v0.3_GPU_Installer.pkg"
+    "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer.pkg|Buckswood_Lens_Physics_v0.5_GPU_Installer.pkg"
     "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer.pkg|Buckswood_Film_Emulation_v2_Installer.pkg"
     "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_Installer.pkg|Buckswood_Cinematic_Tools_v2_Installer.pkg"
     "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer.pkg|Buckswood_Look_DNA_v2_Installer.pkg"
@@ -49,12 +49,14 @@ Release for DaVinci Resolve / OpenFX on macOS and Windows.
   - Adjustment Layer Guard
   - safer default temporal behavior
 
-- `Buckswood_AI_Photorealizer_v0.2_Installer.pkg`
+- `Buckswood_AI_Photorealizer_v0.3_GPU_Installer.pkg`
   - photoreal AI assist
+  - lossless Metal acceleration on Apple Silicon
   - Adjustment Layer Guard
   - universal macOS binary
 
-- `Buckswood_Lens_Physics_v0.4_Overdrive_Edge_Guard_Installer.pkg`
+- `Buckswood_Lens_Physics_v0.5_GPU_Installer.pkg`
+  - lossless Metal acceleration on Apple Silicon
   - Overdrive Edge Guard for high-contrast silhouettes
   - reduced artificial CA/fringing outlines on hard edges
   - preserves lens character in texture, glow, and highlights

@@ -5,8 +5,8 @@ Free cinematic post-production tools for DaVinci Resolve, with native Premiere P
 This repository contains the source for eight Buckswood Resolve tools:
 
 - **Buckswood Fake Diagnostic v2.1** - a supervisor-style diagnostic overlay for AI, CG, and compositing shots that feel fake.
-- **Buckswood Lens Physics v0.4** - lens-character simulation with overdrive edge protection, chromatic aberration, bloom, coma, vignette, and IMAX/Dune-inspired presets.
-- **Buckswood AI Photorealizer v0.2** - a conservative de-plastic and photoreal assist pass for AI/CG/phone footage.
+- **Buckswood Lens Physics v0.5** - lossless Metal/OpenCL acceleration, lens-character simulation, overdrive edge protection, chromatic aberration, bloom, coma, vignette, and IMAX/Dune-inspired presets.
+- **Buckswood AI Photorealizer v0.3** - lossless Metal/OpenCL acceleration and a conservative de-plastic and photoreal assist pass for AI/CG/phone footage.
 - **Buckswood Film Emulation v2.0** - AI-footage-first film finishing with negative/print process controls, texture-only mode, temporal reconstruction, grain, halation, bloom, and printer-light trims.
 - **Buckswood Frame Director v2.0** - five-frame, cut-aware composition assistance with Subject Lock.
 - **Buckswood Radiance Recover v2.0** - floating-point SDR radiance expansion with an optional HDRTVNet++ cache.
@@ -86,6 +86,15 @@ Windows Resolve package from macOS:
 ```bash
 bash scripts/build_windows_release.sh
 ```
+
+Apple GPU performance and CPU/GPU quality benchmark:
+
+```bash
+bash scripts/run_gpu_performance_benchmark.sh
+```
+
+See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for backend selection,
+quality tolerances, and measured results.
 
 Nuke OFX package:
 

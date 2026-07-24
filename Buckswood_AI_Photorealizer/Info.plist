@@ -12,12 +12,12 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Buckswood AI Photorealizer v0.2</string>
+  <string>Buckswood AI Photorealizer v0.3</string>
   <key>CFBundlePackageType</key>
   <string>BNDL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.2.0</string>
+  <string>0.3.0</string>
   <key>CFBundleVersion</key>
-  <string>0.2.0</string>
+  <string>0.3.0</string>
 </dict>
 </plist>

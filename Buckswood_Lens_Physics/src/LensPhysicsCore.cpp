@@ -2,6 +2,38 @@
 
 namespace buckswood_lens {
 
+LensPhysicsCore::PreparedState LensPhysicsCore::prepare(
+    const FrameInfo& frame,
+    const Controls& controls)
+{
+    LensModel model = modelForPreset(controls.lensPreset);
+    model.distortion += controls.distortion * 0.18f;
+    model.chromaticAberration += controls.chromaticAberration;
+    model.fringing += controls.fringing;
+    model.coma += controls.coma;
+    model.bloom += controls.bloom;
+    model.vignette += controls.vignette;
+    model.cornerColor += controls.cornerColor;
+    model.swirl += controls.swirl;
+    model.sharpener += controls.fStopSharpener;
+
+    const float lensAmount = clamp01(controls.effectStrength) * clamp01(controls.outputMix);
+    const float rawOverdrive = std::max(0.0f, controls.overdrive);
+    const float width = static_cast<float>(std::max(1, frame.width));
+    const float height = static_cast<float>(std::max(1, frame.height));
+    return PreparedState{
+        model,
+        controls,
+        rawOverdrive,
+        rawOverdrive * lensAmount,
+        width,
+        height,
+        (width - 1.0f) * 0.5f,
+        (height - 1.0f) * 0.5f,
+        safeDiv(width, height),
+    };
+}
+
 LensPhysicsCore::LensModel LensPhysicsCore::modelForPreset(int preset)
 {
     switch (preset) {

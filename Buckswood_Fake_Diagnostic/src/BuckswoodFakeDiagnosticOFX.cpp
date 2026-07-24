@@ -2,11 +2,10 @@
 #include <cstring>
 #include <exception>
 #include <new>
-#include <thread>
 #include <type_traits>
-#include <vector>
 
 #include "FakeDiagnosticCore.h"
+#include "OfxRenderRuntime.h"
 
 #include "ofxImageEffect.h"
 #include "ofxMemory.h"
@@ -28,6 +27,7 @@ OfxHost* gHost = nullptr;
 OfxImageEffectSuiteV1* gEffectHost = nullptr;
 OfxPropertySuiteV1* gPropHost = nullptr;
 OfxParameterSuiteV1* gParamHost = nullptr;
+OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.fake.diagnostic";
 constexpr int kPluginMajorVersion = 2;
@@ -348,32 +348,11 @@ OfxStatus renderTyped(
         }
     };
 
-    // Rows are split into contiguous bands, one per thread; every thread
-    // writes disjoint rows, so the output is identical to a serial loop.
-    const int rowCount = renderWindow.y2 - renderWindow.y1;
-    const unsigned threadCount = std::min<unsigned>(
-        std::max(1u, std::thread::hardware_concurrency()),
-        static_cast<unsigned>(std::max(1, rowCount)));
-    if (threadCount <= 1) {
-        renderRows(renderWindow.y1, renderWindow.y2);
-        return kOfxStatOK;
-    }
-
-    const int rowsPerBand = (rowCount + static_cast<int>(threadCount) - 1) / static_cast<int>(threadCount);
-    std::vector<std::thread> workers;
-    workers.reserve(threadCount);
-    for (unsigned t = 0; t < threadCount; ++t) {
-        const int yBegin = renderWindow.y1 + static_cast<int>(t) * rowsPerBand;
-        const int yEnd = std::min(renderWindow.y2, yBegin + rowsPerBand);
-        if (yBegin >= yEnd) {
-            break;
-        }
-        workers.emplace_back(renderRows, yBegin, yEnd);
-    }
-    for (auto& worker : workers) {
-        worker.join();
-    }
-    return kOfxStatOK;
+    return buckswood::ofx_runtime::parallelRows(
+        gThreadHost,
+        renderWindow.y1,
+        renderWindow.y2,
+        renderRows);
 }
 
 class NoImageEx {};
@@ -655,6 +634,8 @@ OfxStatus onLoad()
         reinterpret_cast<const OfxPropertySuiteV1*>(gHost->fetchSuite(gHost->host, kOfxPropertySuite, 1)));
     gParamHost = const_cast<OfxParameterSuiteV1*>(
         reinterpret_cast<const OfxParameterSuiteV1*>(gHost->fetchSuite(gHost->host, kOfxParameterSuite, 1)));
+    gThreadHost = const_cast<OfxMultiThreadSuiteV1*>(
+        reinterpret_cast<const OfxMultiThreadSuiteV1*>(gHost->fetchSuite(gHost->host, kOfxMultiThreadSuite, 1)));
     if (!gEffectHost || !gPropHost || !gParamHost) {
         return kOfxStatErrMissingHostFeature;
     }

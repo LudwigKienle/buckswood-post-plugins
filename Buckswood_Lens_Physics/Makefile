@@ -11,16 +11,18 @@ BUNDLE_DIR := $(DIST_DIR)/$(BUNDLE_NAME)
 CXX ?= clang++
 ARCHFLAGS ?= -arch arm64 -arch x86_64
 CXXFLAGS := -std=c++17 -O3 -fvisibility=hidden -Wall -Wextra \
-	$(ARCHFLAGS) -Iinclude -I$(OFX_INCLUDE)
-LDFLAGS_BUNDLE := -bundle
+	$(ARCHFLAGS) -Iinclude -I$(ROOT_DIR)/shared -I$(OFX_INCLUDE)
+LDFLAGS_BUNDLE := -bundle -framework Metal -framework Foundation
 
 CORE_SRC := src/LensPhysicsCore.cpp
 OFX_SRC := src/BuckswoodLensPhysicsOFX.cpp
+METAL_SRC := src/LensPhysicsMetal.mm
 SMOKE_SRC := src/lens_physics_smoketest.cpp
+METAL_TEST_SRC := src/lens_physics_metal_test.mm
 
-.PHONY: all bundle smoketest install install-user dctl-install clean check-toolchain
+.PHONY: all bundle smoketest metaltest install install-user dctl-install clean check-toolchain
 
-all: bundle smoketest
+all: bundle smoketest metaltest
 
 check-toolchain:
 	@$(CXX) --version >/dev/null
@@ -31,8 +33,8 @@ $(BUILD_DIR):
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
 
-$(BUILD_DIR)/$(OFX_BINARY): $(CORE_SRC) $(OFX_SRC) | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS_BUNDLE) $(CORE_SRC) $(OFX_SRC) -o $@
+$(BUILD_DIR)/$(OFX_BINARY): $(CORE_SRC) $(OFX_SRC) $(METAL_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS_BUNDLE) $(CORE_SRC) $(OFX_SRC) $(METAL_SRC) -o $@
 
 bundle: $(BUILD_DIR)/$(OFX_BINARY) | $(DIST_DIR)
 	rm -rf $(BUNDLE_DIR)
@@ -46,6 +48,13 @@ $(BUILD_DIR)/lens_physics_smoketest: $(CORE_SRC) $(SMOKE_SRC) | $(BUILD_DIR)
 
 smoketest: $(BUILD_DIR)/lens_physics_smoketest
 	$(BUILD_DIR)/lens_physics_smoketest
+
+$(BUILD_DIR)/lens_physics_metal_test: $(CORE_SRC) $(METAL_SRC) $(METAL_TEST_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -framework Metal -framework Foundation \
+		$(CORE_SRC) $(METAL_SRC) $(METAL_TEST_SRC) -o $@
+
+metaltest: $(BUILD_DIR)/lens_physics_metal_test
+	$(BUILD_DIR)/lens_physics_metal_test
 
 install: bundle
 	mkdir -p /Library/OFX/Plugins

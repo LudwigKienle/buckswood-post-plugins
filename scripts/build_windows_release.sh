@@ -41,6 +41,7 @@ COMMON_FLAGS=(
 
 "$CXX" "${COMMON_FLAGS[@]}" \
   -I"$ROOT_DIR/Buckswood_Fake_Diagnostic/include" \
+  -I"$ROOT_DIR/shared" \
   -I"$ROOT_DIR/third_party/openfx/include" \
   -shared \
   "$ROOT_DIR/Buckswood_Fake_Diagnostic/src/FakeDiagnosticCore.cpp" \
@@ -49,22 +50,29 @@ COMMON_FLAGS=(
 
 "$CXX" "${COMMON_FLAGS[@]}" \
   -I"$ROOT_DIR/Buckswood_Lens_Physics/include" \
+  -I"$ROOT_DIR/shared" \
   -I"$ROOT_DIR/third_party/openfx/include" \
   -shared \
   "$ROOT_DIR/Buckswood_Lens_Physics/src/LensPhysicsCore.cpp" \
+  "$ROOT_DIR/shared/OpenCLDynamic.cpp" \
+  "$ROOT_DIR/Buckswood_Lens_Physics/src/LensPhysicsOpenCL.cpp" \
   "$ROOT_DIR/Buckswood_Lens_Physics/src/BuckswoodLensPhysicsOFX.cpp" \
   -o "$BUILD_DIR/BuckswoodLensPhysics.ofx"
 
 "$CXX" "${COMMON_FLAGS[@]}" \
   -I"$ROOT_DIR/Buckswood_AI_Photorealizer/include" \
+  -I"$ROOT_DIR/shared" \
   -I"$ROOT_DIR/third_party/openfx/include" \
   -shared \
   "$ROOT_DIR/Buckswood_AI_Photorealizer/src/PhotorealizerCore.cpp" \
+  "$ROOT_DIR/shared/OpenCLDynamic.cpp" \
+  "$ROOT_DIR/Buckswood_AI_Photorealizer/src/PhotorealizerOpenCL.cpp" \
   "$ROOT_DIR/Buckswood_AI_Photorealizer/src/BuckswoodAIPhotorealizerOFX.cpp" \
   -o "$BUILD_DIR/BuckswoodAIPhotorealizer.ofx"
 
 "$CXX" "${COMMON_FLAGS[@]}" \
   -I"$ROOT_DIR/Buckswood_Film_Emulation/include" \
+  -I"$ROOT_DIR/shared" \
   -I"$ROOT_DIR/third_party/openfx/include" \
   -shared \
   "$ROOT_DIR/Buckswood_Film_Emulation/src/FilmEmulationCore.cpp" \
@@ -73,6 +81,7 @@ COMMON_FLAGS=(
 
 "$CXX" "${COMMON_FLAGS[@]}" \
   -I"$ROOT_DIR/Buckswood_Cinematic_Tools/include" \
+  -I"$ROOT_DIR/shared" \
   -I"$ROOT_DIR/third_party/openfx/include" \
   -shared \
   "$ROOT_DIR/Buckswood_Cinematic_Tools/src/CinematicToolsCore.cpp" \
@@ -81,6 +90,7 @@ COMMON_FLAGS=(
 
 "$CXX" "${COMMON_FLAGS[@]}" \
   -I"$ROOT_DIR/Buckswood_Look_DNA/include" \
+  -I"$ROOT_DIR/shared" \
   -I"$ROOT_DIR/third_party/openfx/include" \
   -shared \
   "$ROOT_DIR/Buckswood_Look_DNA/src/LookDNACore.cpp" \
