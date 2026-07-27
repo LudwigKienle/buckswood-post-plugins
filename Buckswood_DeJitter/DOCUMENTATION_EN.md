@@ -1,4 +1,4 @@
-# Buckswood DeJitter v1.1
+# Buckswood DeJitter v1.2
 
 ## Purpose
 
@@ -9,12 +9,17 @@ image region in the previous and next frames.
 ## Quick start
 
 1. Apply the effect to a clip or Color node.
-2. Set `View` to `Tracking Region`.
-3. Place `Track Point` on a sharp, static detail with good contrast.
-4. Refine it with `Track Point Fine X/Y`; optionally enable texture snapping.
-5. Size `Tracking Region Width/Height` around that detail.
+2. Enable `Show Viewer Tracking Area`.
+3. Drag the center cross or the rectangle interior onto a sharp, static detail.
+4. Drag side handles to change one dimension or corner handles to resize both.
+5. Refine the point with `Track Point Fine X/Y`; optionally enable texture
+   snapping.
 6. Use `Motion Vector` to verify a stable track.
 7. Return to `Stabilized Result` and adjust `DeJitter Strength`.
+
+The viewer rectangle selects the region used to estimate motion. It is not a
+local effect mask: stabilization is applied to the full frame. Use a Resolve
+node mask when the correction should affect only part of the image.
 
 ## Controls
 
@@ -23,6 +28,8 @@ image region in the previous and next frames.
 - `Snap Point to Texture`: searches nearby for a stronger rigid detail.
 - `Texture Snap Radius`: maximum distance used by texture snapping.
 - `Tracking Region Width/Height`: tracking mask size relative to the frame.
+- `Show Viewer Tracking Area`: displays the interactive center and resize
+  handles in the Resolve viewer.
 - `Maximum Jitter`: pixel search radius.
 - `Temporal Analysis`: one frame pair is faster; two pairs are steadier.
 - `Tracking Quality`: tracking accuracy and processing cost.
@@ -35,11 +42,14 @@ image region in the previous and next frames.
 - `Frame Edge Handling`: Auto Zoom, reflection, or edge extension.
 - `Output Mix`: blend between original and stabilized image.
 
-## V1.1 performance
+## V1.2 viewer controls and performance
 
 Normalized correlation now samples each candidate patch once. Frames with no
 trusted correction also bypass high-quality resampling. Neither optimization
 reduces the selected tracking quality or final interpolation quality.
+
+The v1.2 overlay uses the host-independent OpenFX Draw Suite. It only draws
+viewer controls and does not become part of the rendered image.
 
 ## Diagnostic views
 

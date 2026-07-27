@@ -9,7 +9,7 @@ BUILD_DIR="$ROOT_DIR/build/windows"
 RELEASE_DIR="$ROOT_DIR/release/windows"
 BUNDLE_NAME="BuckswoodDeJitter.ofx.bundle"
 BUNDLE_DIR="$RELEASE_DIR/$BUNDLE_NAME"
-ZIP_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.1_Windows.zip"
+ZIP_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.2_Windows.zip"
 
 [[ -x "$CXX" ]] || {
     echo "Missing Windows cross-compiler: $CXX" >&2
@@ -34,6 +34,7 @@ mkdir -p "$BUILD_DIR" "$BUNDLE_DIR/Contents/Win64"
     -I"$REPO_ROOT/third_party/openfx/include" \
     -shared \
     "$ROOT_DIR/src/DeJitterCore.cpp" \
+    "$ROOT_DIR/src/DeJitterOverlay.cpp" \
     "$ROOT_DIR/src/BuckswoodDeJitterOFX.cpp" \
     -o "$BUILD_DIR/BuckswoodDeJitter.ofx"
 

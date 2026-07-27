@@ -5,16 +5,16 @@ export COPYFILE_DISABLE=1
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APP_NAME="Buckswood DeJitter v1.1"
+APP_NAME="Buckswood DeJitter v1.2"
 IDENTIFIER="com.buckswood.dejitter.installer"
-VERSION="1.1.0"
+VERSION="1.2.0"
 PLUGIN_BUNDLE="BuckswoodDeJitter.ofx.bundle"
 PKGROOT="$ROOT_DIR/packaging/pkgroot"
 PKG_SCRIPTS="$ROOT_DIR/packaging/scripts"
 RELEASE_DIR="$ROOT_DIR/release"
 DMG_STAGE="$ROOT_DIR/packaging/dmg_stage"
-PKG_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer.pkg"
-DMG_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer.dmg"
+PKG_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.2_Installer.pkg"
+DMG_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.2_Installer.dmg"
 NOTARY_PROFILE="${NOTARY_PROFILE:-BuckswoodNotary}"
 
 detect_identity() {
@@ -68,9 +68,9 @@ if [[ -n "$DEVELOPER_ID_INSTALLER" ]]; then
     productsign \
         --sign "$DEVELOPER_ID_INSTALLER" \
         "$PKG_PATH" \
-        "$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer_Signed.pkg"
+        "$RELEASE_DIR/Buckswood_DeJitter_v1.2_Installer_Signed.pkg"
     mv \
-        "$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer_Signed.pkg" \
+        "$RELEASE_DIR/Buckswood_DeJitter_v1.2_Installer_Signed.pkg" \
         "$PKG_PATH"
 fi
 
@@ -109,9 +109,9 @@ fi
 (
     cd "$RELEASE_DIR"
     shasum -a 256 \
-        Buckswood_DeJitter_v1.1_Installer.pkg \
-        Buckswood_DeJitter_v1.1_Installer.dmg \
-        > Buckswood_DeJitter_v1.1_SHA256SUMS.txt
+        Buckswood_DeJitter_v1.2_Installer.pkg \
+        Buckswood_DeJitter_v1.2_Installer.dmg \
+        > Buckswood_DeJitter_v1.2_SHA256SUMS.txt
 )
 
 echo "Built $PKG_PATH"

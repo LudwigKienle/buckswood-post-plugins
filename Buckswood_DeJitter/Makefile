@@ -14,7 +14,7 @@ CXXFLAGS := -std=c++17 -O3 -fvisibility=hidden -Wall -Wextra \
 	$(ARCHFLAGS) -Iinclude -I$(ROOT_DIR)/shared -I$(OFX_INCLUDE)
 LDFLAGS_BUNDLE := -bundle
 
-CORE_SRC := src/DeJitterCore.cpp
+CORE_SRC := src/DeJitterCore.cpp src/DeJitterOverlay.cpp
 OFX_SRC := src/BuckswoodDeJitterOFX.cpp
 SMOKE_SRC := src/dejitter_smoketest.cpp
 

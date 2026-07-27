@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.7.1 - 2026-07-27
+
+- Updated Buckswood DeJitter to v1.2 with a native OpenFX Draw Suite overlay.
+- Added a draggable tracking center and eight viewer resize handles.
+- Added independent side-handle resizing and combined corner resizing.
+- Added `Show Viewer Tracking Area` and clearer analysis-region guidance.
+- Clarified that the tracking rectangle controls motion analysis while the
+  stabilization result is applied to the full frame.
+- Rebuilt, signed, and notarized the universal macOS installer and rebuilt the
+  Windows x64 package.
+
 ## Look DNA v2.1.0 - 2026-07-24
 
 - Added native Browse / Load buttons for reference slots A, B, and C in
