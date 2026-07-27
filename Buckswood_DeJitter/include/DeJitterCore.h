@@ -59,6 +59,8 @@ struct Controls {
     bool enabled = true;
     float trackX = 0.0f;
     float trackY = 0.0f;
+    bool textureSnap = false;
+    int textureSnapRadius = 24;
     float regionWidth = 0.12f;
     float regionHeight = 0.12f;
     int searchRadius = 32;
@@ -116,9 +118,11 @@ struct TrackingResult {
     float confidence = 0.0f;
     float textureConfidence = 0.0f;
     float autoZoom = 1.0f;
+    Vec2 requestedTrackCenter;
     Vec2 trackCenter;
     float regionHalfWidth = 0.0f;
     float regionHalfHeight = 0.0f;
+    bool pointSnapped = false;
     bool valid = false;
 };
 

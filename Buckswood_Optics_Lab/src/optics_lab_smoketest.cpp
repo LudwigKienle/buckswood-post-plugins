@@ -26,8 +26,11 @@ bool near(float a, float b, float epsilon = 0.0001f)
 }
 
 struct TestSampler {
+    mutable int sampleCount = 0;
+
     Pixel sample(float x, float y) const
     {
+        ++sampleCount;
         const float checker = (static_cast<int>(std::floor(x / 4.0f)) +
                                static_cast<int>(std::floor(y / 4.0f))) % 2
             ? 0.15f
@@ -51,10 +54,15 @@ Controls defaults()
     c.focusDistance = 3.0f;
     c.sensorWidth = 36.0f;
     c.anamorphicSqueeze = 1.0f;
+    c.anamorphicAngle = 0.0f;
     c.bloomThreshold = 0.82f;
+    c.depthNear = 0.0f;
+    c.depthFar = 1.0f;
+    c.depthGamma = 1.0f;
     c.focusPlane = 0.5f;
     c.grainSize = 1.0f;
     c.grainSeed = 1.0f;
+    c.sensorISO = 400.0f;
     c.apertureInfluence = 1.0f;
     c.dirtScale = 1.0f;
     c.edgeGuard = 0.8f;
@@ -77,6 +85,17 @@ int main()
     require(near(identity.b, dry.b), "manual neutral preserves blue");
     require(near(identity.a, dry.a), "manual neutral preserves alpha");
 
+    TestSampler identitySampler;
+    OpticsLabCore::processPixel(
+        identitySampler,
+        20,
+        17,
+        frame,
+        neutral);
+    require(
+        identitySampler.sampleCount == 1,
+        "neutral render uses the single-sample fast path");
+
     Controls hdr = defaults();
     hdr.preset = 1;
     const Pixel hdrResult = OpticsLabCore::processPixel(sampler, 20, 17, frame, hdr);
@@ -98,6 +117,44 @@ int main()
     require(
         std::fabs(depthResult.r - sampler.sample(8.0f, 17.0f).r) > 0.001f,
         "source alpha drives depth-aware defocus");
+
+    Controls invertedDepth = depth;
+    invertedDepth.focusPlane = 0.2f;
+    invertedDepth.depthInvert = true;
+    const Pixel invertedDepthResult =
+        OpticsLabCore::processPixel(
+            sampler,
+            8,
+            17,
+            frame,
+            invertedDepth);
+    require(
+        std::fabs(invertedDepthResult.r - depthResult.r) > 0.001f,
+        "alpha depth inversion changes calibrated defocus");
+
+    Controls lowIso = defaults();
+    lowIso.grain = 0.35f;
+    lowIso.sensorISO = 100.0f;
+    const Pixel lowIsoResult =
+        OpticsLabCore::processPixel(
+            sampler,
+            20,
+            17,
+            frame,
+            lowIso);
+    Controls highIso = lowIso;
+    highIso.sensorISO = 1600.0f;
+    const Pixel highIsoResult =
+        OpticsLabCore::processPixel(
+            sampler,
+            20,
+            17,
+            frame,
+            highIso);
+    require(
+        std::fabs(highIsoResult.g - dry.g) >
+            std::fabs(lowIsoResult.g - dry.g) * 2.5f,
+        "sensor ISO scales grain energy");
 
     std::vector<float> aperturePixels = {
         0.0f, 1.0f, 0.0f,

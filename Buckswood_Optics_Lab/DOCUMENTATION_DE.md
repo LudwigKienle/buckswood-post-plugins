@@ -1,4 +1,4 @@
-# Buckswood Optics Lab v1.0
+# Buckswood Optics Lab v1.1
 
 ## Zweck
 
@@ -25,6 +25,7 @@ durch ein reales Objektiv und einen realen Sensor wirkt.
 - `Focus Distance`: steuert den Focus-Breathing-Faktor.
 - `Sensor Width`: verändert die relative Bildkreis-/Fokalwirkung.
 - `Anamorphic Squeeze`: formt Bokeh und Streak horizontal.
+- `Anamorphic Axis`: dreht Bokeh-Ellipse und Streak passend zur Objektivachse.
 
 ### Aberrations
 
@@ -41,6 +42,9 @@ durch ein reales Objektiv und einen realen Sensor wirkt.
 
 - `Uniform Focus Offset`: globale Test-/Look-Unschärfe.
 - `Source Alpha as Depth`: interpretiert Alpha als 0-bis-1-Tiefenkanal.
+- `Invert Alpha Depth`: kehrt Vorder- und Hintergrund der Depth Map um.
+- `Alpha Depth Near/Far`: kalibriert den tatsächlich genutzten Wertebereich.
+- `Alpha Depth Gamma`: verteilt die Fokusabstände innerhalb der Depth Map.
 - `Alpha Focus Plane`: die Alpha-Tiefe, die scharf bleiben soll.
 - `Cat-Eye Bokeh`: beschneidet Bokeh zum Bildrand.
 - `Glass Aperture Index`: 1 bis 157 lädt das entsprechende lokale Aperture-JPG.
@@ -59,6 +63,7 @@ erhalten. Für eine separate Depth Map ist später eine Multi-Input-Version sinn
 - `Sensor Debayer Character`: weichere Rot-/Blau-Details bei schärferem Grün.
 - `Chroma Detail Smear`: reduziert unnatürlich perfekte Farbauflösung.
 - `Sensor Grain`: zeitlich animiertes, helligkeitsabhängiges Korn.
+- `Sensor ISO`: skaliert die Kornenergie relativ zu ISO 400.
 - `Edge Halo Guard`: reduziert Doppelkonturen an harten Silhouetten.
 
 ## Lokale Glass-Assets
@@ -73,7 +78,14 @@ Mit dem Ordner-Browser kann auch direkt der ursprüngliche `glass`-Ordner gewäh
 werden. Die bezahlten Aperture-Dateien sind nicht Bestandteil des öffentlichen
 GitHub-Releases.
 
-## Grenzen der ersten Version
+## Performance in v1.1
+
+Inaktive Stufen führen keine unnötigen Nachbarschafts-, CA- oder Mapping-Samples
+mehr aus. Der neutrale Pfad benötigt nur den Originalpixel. Assets bleiben
+dekodiert im Cache; die finale Bildqualität und Tap-Anzahl aktiver Effekte wurden
+nicht reduziert.
+
+## Grenzen
 
 - Kein echter Deep-Defocus und kein separater Depth-Eingang auf der Color Page.
 - Flare reagiert lokal auf Highlights und ersetzt keine vollständige Lichtquellenanalyse.

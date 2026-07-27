@@ -1,4 +1,4 @@
-# Buckswood Optics Lab v1.0
+# Buckswood Optics Lab v1.1
 
 ## Purpose
 
@@ -24,6 +24,7 @@ digital or AI-generated footage feel photographed rather than mathematically per
 - `Focus Distance` drives focus breathing.
 - `Sensor Width` changes the relationship between image circle and focal length.
 - `Anamorphic Squeeze` shapes bokeh and horizontal streaks.
+- `Anamorphic Axis` rotates the bokeh ellipse and streak direction.
 
 ### Aberrations
 
@@ -40,6 +41,9 @@ digital or AI-generated footage feel photographed rather than mathematically per
 
 - `Uniform Focus Offset`: global look-development blur.
 - `Source Alpha as Depth`: interprets alpha as a normalized depth channel.
+- `Invert Alpha Depth`: swaps foreground and background depth direction.
+- `Alpha Depth Near/Far`: calibrates the useful range of the depth channel.
+- `Alpha Depth Gamma`: redistributes focus distances within that range.
 - `Alpha Focus Plane`: alpha depth that remains in focus.
 - `Cat-Eye Bokeh`: clips bokeh toward the edge of frame.
 - `Glass Aperture Index`: values 1 through 157 load the matching local aperture JPG.
@@ -54,6 +58,7 @@ separate depth clip without repurposing alpha.
 - `Sensor Debayer Character` softens red/blue detail while retaining green detail.
 - `Chroma Detail Smear` reduces unnaturally perfect color resolution.
 - `Sensor Grain` is temporally animated and luminance dependent.
+- `Sensor ISO` scales grain energy relative to ISO 400.
 - `Edge Halo Guard` reduces doubled silhouettes and hard contour halos.
 
 ## Local Glass assets
@@ -67,7 +72,13 @@ The licensed installer copies the local assets to:
 The directory browser can also point directly at an existing `glass` folder. Paid
 aperture images are deliberately excluded from the public GitHub release.
 
-## V1 limitations
+## V1.1 performance
+
+Inactive stages no longer perform unnecessary neighborhood, CA, or mapping
+samples. The neutral path reads only the source pixel, while active effects keep
+their full-quality sample counts. Decoded local assets remain cached.
+
+## Limitations
 
 - No deep defocus or dedicated depth input on the Resolve Color Page.
 - Flare is highlight-local and does not perform global light-source detection.

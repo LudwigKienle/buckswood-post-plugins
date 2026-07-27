@@ -47,4 +47,4 @@ echo "Licensed local assets:"
 echo "  $ASSET_TARGET"
 echo
 echo "Restart DaVinci Resolve, then open:"
-echo "  Effects > Buckswood > Buckswood Optics Lab v1.0"
+echo "  Effects > Buckswood > Buckswood Optics Lab v1.1"

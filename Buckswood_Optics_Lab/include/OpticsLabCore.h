@@ -56,6 +56,7 @@ struct Controls {
     float focusDistance;
     float sensorWidth;
     float anamorphicSqueeze;
+    float anamorphicAngle;
 
     float distortion;
     float breathing;
@@ -68,6 +69,10 @@ struct Controls {
     float swirl;
 
     int depthSource;
+    bool depthInvert;
+    float depthNear;
+    float depthFar;
+    float depthGamma;
     float focusPlane;
     float focusOffset;
     float defocus;
@@ -87,6 +92,7 @@ struct Controls {
     float grain;
     float grainSize;
     float grainSeed;
+    float sensorISO;
     float apertureInfluence;
     float dirtAmount;
     float dirtScale;
@@ -141,6 +147,11 @@ public:
         float apertureScale;
         float focalScale;
         float breathingScale;
+        float anamorphicCos;
+        float anamorphicSin;
+        float isoGrainScale;
+        bool needsEdgeGuard;
+        bool identityMapping;
     };
 
     static PreparedState prepare(const FrameInfo& frame, const Controls& controls);
@@ -241,7 +252,9 @@ Pixel OpticsLabCore::processPixel(
     const AssetViews* assets)
 {
     const Pixel dry = sampler.sample(static_cast<float>(x), static_cast<float>(y));
-    if (state.amount <= 0.000001f) {
+    if (
+        state.amount <= 0.000001f ||
+        state.controls.outputMix <= 0.000001f) {
         return dry;
     }
 
@@ -266,22 +279,38 @@ Pixel OpticsLabCore::processPixel(
     const float tangentX = -dirY;
     const float tangentY = dirX;
 
-    const Pixel dryLeft = sampler.sample(static_cast<float>(x - 1), static_cast<float>(y));
-    const Pixel dryRight = sampler.sample(static_cast<float>(x + 1), static_cast<float>(y));
-    const Pixel dryUp = sampler.sample(static_cast<float>(x), static_cast<float>(y - 1));
-    const Pixel dryDown = sampler.sample(static_cast<float>(x), static_cast<float>(y + 1));
     const float dryY = luma(dry);
-    const float localGradient =
-        std::fabs(luma(dryRight) - luma(dryLeft)) +
-        std::fabs(luma(dryDown) - luma(dryUp));
-    const float contourRisk = smoothstep(0.045f, 0.42f, localGradient);
-    const float guard = clamp01(c.edgeGuard) * contourRisk;
+    float guard = 0.0f;
+    if (state.needsEdgeGuard) {
+        const Pixel dryLeft = sampler.sample(
+            static_cast<float>(x - 1),
+            static_cast<float>(y));
+        const Pixel dryRight = sampler.sample(
+            static_cast<float>(x + 1),
+            static_cast<float>(y));
+        const Pixel dryUp = sampler.sample(
+            static_cast<float>(x),
+            static_cast<float>(y - 1));
+        const Pixel dryDown = sampler.sample(
+            static_cast<float>(x),
+            static_cast<float>(y + 1));
+        const float localGradient =
+            std::fabs(luma(dryRight) - luma(dryLeft)) +
+            std::fabs(luma(dryDown) - luma(dryUp));
+        const float contourRisk =
+            smoothstep(0.045f, 0.42f, localGradient);
+        guard = clamp01(c.edgeGuard) * contourRisk;
+    }
 
     const float swirlAngle = model.swirl * state.amount * edge2 * 0.24f;
-    const float cosAngle = std::cos(swirlAngle);
-    const float sinAngle = std::sin(swirlAngle);
-    const float sx = nx * cosAngle - ny * sinAngle;
-    const float sy = nx * sinAngle + ny * cosAngle;
+    float sx = nx;
+    float sy = ny;
+    if (std::fabs(swirlAngle) > 0.000001f) {
+        const float cosAngle = std::cos(swirlAngle);
+        const float sinAngle = std::sin(swirlAngle);
+        sx = nx * cosAngle - ny * sinAngle;
+        sy = nx * sinAngle + ny * cosAngle;
+    }
 
     const float r2 = radius * radius;
     const float radial =
@@ -291,14 +320,26 @@ Pixel OpticsLabCore::processPixel(
     const float mappingScale = radial * state.breathingScale;
     const float srcX = cx + sx * mappingScale * cx;
     const float srcY = cy + sy * mappingScale * cy;
-    const Pixel center = sampler.sample(srcX, srcY);
+    const Pixel center =
+        state.identityMapping
+        ? dry
+        : sampler.sample(srcX, srcY);
 
     const float caPixels =
         model.lateralCA * state.amount * edge2 * (1.2f + 2.6f * state.focalScale) *
         (1.0f - guard * 0.82f);
-    const Pixel redSample = sampler.sample(srcX + dirX * caPixels, srcY + dirY * caPixels);
-    const Pixel blueSample = sampler.sample(srcX - dirX * caPixels, srcY - dirY * caPixels);
-    Pixel result{redSample.r, center.g, blueSample.b, dry.a};
+    Pixel result = center;
+    result.a = dry.a;
+    if (caPixels > 0.0001f) {
+        const Pixel redSample = sampler.sample(
+            srcX + dirX * caPixels,
+            srcY + dirY * caPixels);
+        const Pixel blueSample = sampler.sample(
+            srcX - dirX * caPixels,
+            srcY - dirY * caPixels);
+        result.r = redSample.r;
+        result.b = blueSample.b;
+    }
 
     const float curvatureBlur =
         model.fieldCurvature * state.amount * edge2 * (1.0f - guard * 0.78f) * 4.0f;
@@ -370,7 +411,21 @@ Pixel OpticsLabCore::processPixel(
 
     float depthError = std::fabs(c.focusOffset);
     if (c.depthSource == 1) {
-        depthError = std::fabs(clamp01(dry.a) - clamp01(c.focusPlane));
+        const float nearValue = clamp01(c.depthNear);
+        const float farValue = std::max(
+            nearValue + 0.0001f,
+            clamp01(c.depthFar));
+        float depth = clamp01(
+            (clamp01(dry.a) - nearValue) /
+            (farValue - nearValue));
+        if (c.depthInvert) {
+            depth = 1.0f - depth;
+        }
+        depth = std::pow(
+            std::max(0.000001f, depth),
+            clamp(c.depthGamma, 0.10f, 4.0f));
+        depthError =
+            std::fabs(depth - clamp01(c.focusPlane));
     }
     const float defocusStrength =
         model.defocus * state.amount * state.apertureScale *
@@ -389,8 +444,16 @@ Pixel OpticsLabCore::processPixel(
         Pixel blur = mul(center, 2.0f);
         float weightSum = 2.0f;
         for (const auto& offset : kOffsets) {
-            const float ox = offset[0] * horizontal - dirX * catEye * radiusPx * 0.45f;
-            const float oy = offset[1] * vertical - dirY * catEye * radiusPx * 0.45f;
+            const float ellipseX = offset[0] * horizontal;
+            const float ellipseY = offset[1] * vertical;
+            const float ox =
+                ellipseX * state.anamorphicCos -
+                ellipseY * state.anamorphicSin -
+                dirX * catEye * radiusPx * 0.45f;
+            const float oy =
+                ellipseX * state.anamorphicSin +
+                ellipseY * state.anamorphicCos -
+                dirY * catEye * radiusPx * 0.45f;
             const Pixel p = sampler.sample(srcX + ox, srcY + oy);
             float weight = 1.0f;
             if (assets && assets->aperture.valid()) {
@@ -464,8 +527,16 @@ Pixel OpticsLabCore::processPixel(
     const float streakStrength = model.flareStreak * state.amount;
     if (streakStrength > 0.0001f) {
         const float streakRadius = 5.0f + streakStrength * 28.0f;
-        const Pixel left = sampler.sample(srcX - streakRadius, srcY);
-        const Pixel right = sampler.sample(srcX + streakRadius, srcY);
+        const float streakX =
+            state.anamorphicCos * streakRadius;
+        const float streakY =
+            state.anamorphicSin * streakRadius;
+        const Pixel left = sampler.sample(
+            srcX - streakX,
+            srcY - streakY);
+        const Pixel right = sampler.sample(
+            srcX + streakX,
+            srcY + streakY);
         const float hotLeft = smoothstep(c.bloomThreshold, c.bloomThreshold + 0.9f, luma(left));
         const float hotRight = smoothstep(c.bloomThreshold, c.bloomThreshold + 0.9f, luma(right));
         const float amount = streakStrength * 0.15f;
@@ -537,7 +608,8 @@ Pixel OpticsLabCore::processPixel(
         result.b += dirtMask * hot * 0.010f;
     }
 
-    const float grainStrength = model.grain * state.amount;
+    const float grainStrength =
+        model.grain * state.amount * state.isoGrainScale;
     if (grainStrength > 0.0001f) {
         const float size = clamp(c.grainSize, 0.5f, 4.0f);
         const int grainX = static_cast<int>(static_cast<float>(x) / size);

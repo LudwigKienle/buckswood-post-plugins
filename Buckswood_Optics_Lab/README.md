@@ -7,20 +7,25 @@ presets, source code, or paid image assets.
 
 ## Included processing stages
 
-1. Lens state: focal length, f-stop, focus distance, sensor width, anamorphic squeeze.
+1. Lens state: focal length, f-stop, focus distance, sensor width, anamorphic squeeze,
+   and a rotatable anamorphic axis.
 2. Geometry: radial distortion and focus breathing.
 3. Aberrations: lateral/axial chromatic aberration, coma, astigmatism, field
    curvature, spherical aberration, and swirl.
-4. Defocus: uniform focus offset or source alpha as a depth channel, cat-eye shaping,
-   and optional licensed aperture-image weighting.
+4. Defocus: uniform focus offset or calibrated source alpha as a depth channel,
+   near/far/gamma/invert controls, cat-eye shaping, and optional licensed
+   aperture-image weighting.
 5. Finishing: bloom, diffusion, halation, flare ghosts, anamorphic streak, starburst,
    and vignette.
-6. Sensor: debayer character, chroma detail smear, and animated sensor grain.
+6. Sensor: debayer character, chroma detail smear, and ISO-linked animated grain.
 7. Assets: directory browser plus aperture and dirt indices. Images are decoded once
    and cached for subsequent frames.
 
 Float renders preserve scene-linear/HDR values above `1.0`. The effect keeps source
 alpha unchanged and includes an edge guard to reduce doubled contours.
+
+V1.1 skips inactive optical stages and avoids redundant samples while preserving
+full output quality.
 
 ## Build and test
 

@@ -32,7 +32,7 @@ OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.optics.lab";
 constexpr int kPluginMajorVersion = 1;
-constexpr int kPluginMinorVersion = 0;
+constexpr int kPluginMinorVersion = 1;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -135,6 +135,7 @@ buckswood_optics::Controls controlsAtTime(OfxImageEffectHandle instance, OfxTime
     c.focusDistance = static_cast<float>(doubleParamAtTime(instance, "focusDistance", time, 3.0));
     c.sensorWidth = static_cast<float>(doubleParamAtTime(instance, "sensorWidth", time, 36.0));
     c.anamorphicSqueeze = static_cast<float>(doubleParamAtTime(instance, "anamorphicSqueeze", time, 1.0));
+    c.anamorphicAngle = static_cast<float>(doubleParamAtTime(instance, "anamorphicAngle", time, 0.0));
 
     c.distortion = static_cast<float>(doubleParamAtTime(instance, "distortion", time, 0.0));
     c.breathing = static_cast<float>(doubleParamAtTime(instance, "breathing", time, 0.0));
@@ -147,6 +148,10 @@ buckswood_optics::Controls controlsAtTime(OfxImageEffectHandle instance, OfxTime
     c.swirl = static_cast<float>(doubleParamAtTime(instance, "swirl", time, 0.0));
 
     c.depthSource = intParamAtTime(instance, "depthSource", time, 0);
+    c.depthInvert = intParamAtTime(instance, "depthInvert", time, 0) != 0;
+    c.depthNear = static_cast<float>(doubleParamAtTime(instance, "depthNear", time, 0.0));
+    c.depthFar = static_cast<float>(doubleParamAtTime(instance, "depthFar", time, 1.0));
+    c.depthGamma = static_cast<float>(doubleParamAtTime(instance, "depthGamma", time, 1.0));
     c.focusPlane = static_cast<float>(doubleParamAtTime(instance, "focusPlane", time, 0.5));
     c.focusOffset = static_cast<float>(doubleParamAtTime(instance, "focusOffset", time, 0.0));
     c.defocus = static_cast<float>(doubleParamAtTime(instance, "defocus", time, 0.0));
@@ -166,6 +171,7 @@ buckswood_optics::Controls controlsAtTime(OfxImageEffectHandle instance, OfxTime
     c.grain = static_cast<float>(doubleParamAtTime(instance, "grain", time, 0.0));
     c.grainSize = static_cast<float>(doubleParamAtTime(instance, "grainSize", time, 1.0));
     c.grainSeed = static_cast<float>(doubleParamAtTime(instance, "grainSeed", time, 1.0));
+    c.sensorISO = static_cast<float>(doubleParamAtTime(instance, "sensorISO", time, 400.0));
     c.apertureInfluence = static_cast<float>(doubleParamAtTime(instance, "apertureInfluence", time, 0.85));
     c.dirtAmount = static_cast<float>(doubleParamAtTime(instance, "dirtAmount", time, 0.0));
     c.dirtScale = static_cast<float>(doubleParamAtTime(instance, "dirtScale", time, 1.0));
@@ -458,6 +464,22 @@ void defineChoiceParam(
     gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
 }
 
+void defineBooleanParam(
+    OfxParamSetHandle paramSet,
+    const char* name,
+    const char* label,
+    int defaultValue,
+    int pageIndex,
+    OfxPropertySetHandle page)
+{
+    OfxPropertySetHandle props = nullptr;
+    gParamHost->paramDefine(paramSet, kOfxParamTypeBoolean, name, &props);
+    gPropHost->propSetString(props, kOfxParamPropScriptName, 0, name);
+    gPropHost->propSetString(props, kOfxPropLabel, 0, label);
+    gPropHost->propSetInt(props, kOfxParamPropDefault, 0, defaultValue);
+    gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
+}
+
 void defineDirectoryParam(
     OfxParamSetHandle paramSet,
     const char* name,
@@ -509,6 +531,7 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     defineDoubleParam(paramSet, "focusDistance", "Focus Distance (m)", 3.0, 0.2, 1000.0, p++, page);
     defineDoubleParam(paramSet, "sensorWidth", "Sensor Width (mm)", 36.0, 8.0, 70.0, p++, page);
     defineDoubleParam(paramSet, "anamorphicSqueeze", "Anamorphic Squeeze", 1.0, 1.0, 2.0, p++, page);
+    defineDoubleParam(paramSet, "anamorphicAngle", "Anamorphic Axis (Degrees)", 0.0, -180.0, 180.0, p++, page);
 
     defineDoubleParam(paramSet, "distortion", "Distortion Trim", 0.0, -1.0, 1.0, p++, page);
     defineDoubleParam(paramSet, "breathing", "Focus Breathing", 0.0, -1.0, 1.0, p++, page);
@@ -522,6 +545,10 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
 
     const char* depthSources[] = {"Uniform Focus Offset", "Source Alpha as Depth"};
     defineChoiceParam(paramSet, "depthSource", "Depth Source", 0, depthSources, 2, p++, page);
+    defineBooleanParam(paramSet, "depthInvert", "Invert Alpha Depth", 0, p++, page);
+    defineDoubleParam(paramSet, "depthNear", "Alpha Depth Near", 0.0, 0.0, 1.0, p++, page);
+    defineDoubleParam(paramSet, "depthFar", "Alpha Depth Far", 1.0, 0.0, 1.0, p++, page);
+    defineDoubleParam(paramSet, "depthGamma", "Alpha Depth Gamma", 1.0, 0.10, 4.0, p++, page);
     defineDoubleParam(paramSet, "focusPlane", "Alpha Focus Plane", 0.5, 0.0, 1.0, p++, page);
     defineDoubleParam(paramSet, "focusOffset", "Uniform Focus Offset", 0.0, -1.0, 1.0, p++, page);
     defineDoubleParam(paramSet, "defocus", "Defocus", 0.0, 0.0, 1.0, p++, page);
@@ -541,6 +568,7 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     defineDoubleParam(paramSet, "grain", "Sensor Grain", 0.0, 0.0, 1.0, p++, page);
     defineDoubleParam(paramSet, "grainSize", "Grain Size", 1.0, 0.5, 4.0, p++, page);
     defineDoubleParam(paramSet, "grainSeed", "Grain Seed", 1.0, 0.0, 1000.0, p++, page);
+    defineDoubleParam(paramSet, "sensorISO", "Sensor ISO", 400.0, 50.0, 12800.0, p++, page);
 
     defineDirectoryParam(
         paramSet,
@@ -571,7 +599,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(props, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.0");
+    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.1");
     gPropHost->propSetString(props, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
     return kOfxStatOK;

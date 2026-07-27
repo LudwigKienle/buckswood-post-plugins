@@ -39,6 +39,25 @@ OpticsLabCore::PreparedState OpticsLabCore::prepare(
     const float apertureScale = clamp(2.8f / fStop, 0.12f, 3.5f);
     const float breathingScale =
         1.0f + model.breathing * clamp(1.0f / focusDistance, 0.0f, 2.0f) * 0.045f;
+    const float anamorphicRadians =
+        controls.anamorphicAngle *
+        0.01745329251994329577f;
+    const float amount = clamp01(controls.effectStrength);
+    const bool needsEdgeGuard =
+        controls.edgeGuard > 0.0001f &&
+        amount > 0.0001f &&
+        (
+            model.lateralCA > 0.0001f ||
+            model.axialCA > 0.0001f ||
+            model.coma > 0.0001f ||
+            model.astigmatism > 0.0001f ||
+            model.fieldCurvature > 0.0001f ||
+            model.spherical > 0.0001f ||
+            model.defocus > 0.0001f);
+    const bool identityMapping =
+        std::fabs(model.distortion * amount) <= 0.000001f &&
+        std::fabs(model.swirl * amount) <= 0.000001f &&
+        std::fabs(breathingScale - 1.0f) <= 0.000001f;
 
     return PreparedState{
         model,
@@ -49,10 +68,17 @@ OpticsLabCore::PreparedState OpticsLabCore::prepare(
         (width - 1.0f) * 0.5f,
         (height - 1.0f) * 0.5f,
         width / height,
-        clamp01(controls.effectStrength),
+        amount,
         apertureScale,
         focalScale,
         breathingScale,
+        std::cos(anamorphicRadians),
+        std::sin(anamorphicRadians),
+        std::sqrt(
+            clamp(controls.sensorISO, 50.0f, 12800.0f) /
+            400.0f),
+        needsEdgeGuard,
+        identityMapping,
     };
 }
 

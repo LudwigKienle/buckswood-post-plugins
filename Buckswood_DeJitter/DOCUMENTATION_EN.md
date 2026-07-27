@@ -1,4 +1,4 @@
-# Buckswood DeJitter v1.0
+# Buckswood DeJitter v1.1
 
 ## Purpose
 
@@ -11,13 +11,17 @@ image region in the previous and next frames.
 1. Apply the effect to a clip or Color node.
 2. Set `View` to `Tracking Region`.
 3. Place `Track Point` on a sharp, static detail with good contrast.
-4. Size `Tracking Region Width/Height` around that detail.
-5. Use `Motion Vector` to verify a stable track.
-6. Return to `Stabilized Result` and adjust `DeJitter Strength`.
+4. Refine it with `Track Point Fine X/Y`; optionally enable texture snapping.
+5. Size `Tracking Region Width/Height` around that detail.
+6. Use `Motion Vector` to verify a stable track.
+7. Return to `Stabilized Result` and adjust `DeJitter Strength`.
 
 ## Controls
 
 - `Track Point`: center of the analyzed image region.
+- `Track Point Fine X/Y`: pixel-accurate offset added to the viewer handle.
+- `Snap Point to Texture`: searches nearby for a stronger rigid detail.
+- `Texture Snap Radius`: maximum distance used by texture snapping.
 - `Tracking Region Width/Height`: tracking mask size relative to the frame.
 - `Maximum Jitter`: pixel search radius.
 - `Temporal Analysis`: one frame pair is faster; two pairs are steadier.
@@ -30,6 +34,12 @@ image region in the previous and next frames.
 - `Resampling`: Bicubic is the default; Lanczos 3 is the sharpest.
 - `Frame Edge Handling`: Auto Zoom, reflection, or edge extension.
 - `Output Mix`: blend between original and stabilized image.
+
+## V1.1 performance
+
+Normalized correlation now samples each candidate patch once. Frames with no
+trusted correction also bypass high-quality resampling. Neither optimization
+reduces the selected tracking quality or final interpolation quality.
 
 ## Diagnostic views
 

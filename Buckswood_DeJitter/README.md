@@ -22,16 +22,22 @@ make -C Buckswood_DeJitter install-user
 Restart DaVinci Resolve, then open:
 
 ```text
-Color Page > OpenFX > Buckswood > Buckswood DeJitter v1.0
+Color Page > OpenFX > Buckswood > Buckswood DeJitter v1.1
 ```
 
 ## Recommended workflow
 
 1. Set `View` to `Tracking Region`.
-2. Place `Track Point` on a sharp, rigid detail with good contrast.
-3. Size the region so it contains texture but no independently moving subject.
-4. Switch to `Motion Vector` and verify that tracking is stable.
-5. Return to `Stabilized Result` and adjust `DeJitter Strength`.
+2. Drag `Track Point` onto a sharp, rigid detail with good contrast.
+3. Use `Track Point Fine X/Y` for exact pixel placement. Enable
+   `Snap Point to Texture` when the nearby detail is stronger than the click point.
+4. Size the region so it contains texture but no independently moving subject.
+5. Switch to `Motion Vector` and verify that tracking is stable.
+6. Return to `Stabilized Result` and adjust `DeJitter Strength`.
+
+V1.1 uses a single-pass normalized-correlation analysis and skips high-quality
+resampling on unchanged frames. These optimizations reduce render work without
+changing the selected tracking quality.
 
 Use a wall edge, sign, window frame, or fixed prop. Avoid faces, hands, water,
 screens, motion blur, and large reflections.

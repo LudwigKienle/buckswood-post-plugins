@@ -152,6 +152,24 @@ int main()
         tracked.confidence > 0.35f,
         "tracking confidence");
 
+    auto snappedControls = controls;
+    snappedControls.trackX = kFeatureX - 20.0f;
+    snappedControls.textureSnap = true;
+    snappedControls.textureSnapRadius = 28;
+    const auto snapped =
+        buckswood_dejitter::DeJitterCore::analyze(
+            current,
+            temporal,
+            frame,
+            snappedControls);
+    require(snapped.pointSnapped, "texture snap moves the analysis center");
+    require(
+        std::fabs(snapped.trackCenter.x - (kFeatureX + 3.0f)) <
+            std::fabs(
+                snapped.requestedTrackCenter.x -
+                (kFeatureX + 3.0f)),
+        "texture snap moves toward the tracked feature");
+
     const Pixel before = current.sample(kFeatureX, kFeatureY);
     const Pixel after =
         buckswood_dejitter::DeJitterCore::processPixel(
