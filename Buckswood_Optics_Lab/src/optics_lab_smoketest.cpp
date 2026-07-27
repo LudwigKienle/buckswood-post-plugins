@@ -65,6 +65,7 @@ Controls defaults()
     c.sensorISO = 400.0f;
     c.apertureInfluence = 1.0f;
     c.dirtScale = 1.0f;
+    c.smudgeScale = 1.0f;
     c.edgeGuard = 0.8f;
     c.outputMix = 1.0f;
     return c;
@@ -163,6 +164,7 @@ int main()
     };
     const buckswood_optics::AssetViews assets{
         buckswood_optics::TextureView{aperturePixels.data(), 3, 3},
+        buckswood_optics::TextureView{},
         buckswood_optics::TextureView{},
     };
     const auto prepared = OpticsLabCore::prepare(frame, depth);

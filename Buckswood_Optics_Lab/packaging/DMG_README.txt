@@ -1,4 +1,4 @@
-Buckswood Optics Lab v1.1
+Buckswood Optics Lab v1.2
 =========================
 
 Independent optical and sensor finishing for DaVinci Resolve.
@@ -6,9 +6,12 @@ Independent optical and sensor finishing for DaVinci Resolve.
 Installation:
 
 1. Quit DaVinci Resolve.
-2. Open Buckswood_Optics_Lab_v1.1_Installer.pkg.
+2. Open Buckswood_Optics_Lab_v1.2_Installer.pkg.
 3. Complete the installer and restart Resolve.
-4. Open Color > Effects > Buckswood > Buckswood Optics Lab v1.1.
+4. Open Color > Effects > Buckswood > Buckswood Optics Lab v1.2.
+
+Glass, Dirt, and Smudge are selected directly inside the effect. The built-in
+choices do not require a folder or separate asset install.
 
 Optional licensed Glass assets:
 

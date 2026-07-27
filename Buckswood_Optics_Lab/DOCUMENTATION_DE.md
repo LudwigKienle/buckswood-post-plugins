@@ -1,4 +1,4 @@
-# Buckswood Optics Lab v1.1
+# Buckswood Optics Lab v1.2
 
 ## Zweck
 
@@ -12,11 +12,16 @@ durch ein reales Objektiv und einen realen Sensor wirkt.
 2. Ein dezentes Preset wählen, meist `AI Deplastic` oder `Large Format Clean`.
 3. Focal Length, F-Stop, Sensor Width und Anamorphic Squeeze an die Szene anpassen.
 4. Aberrationen nur so weit erhöhen, bis die digitale Perfektion verschwindet.
-5. Defocus und Glass Aperture nur bei tatsächlich unscharfen Bildbereichen verwenden.
+5. Eine integrierte `Glass`-Form wählen und Defocus nur bei tatsächlich unscharfen
+   Bildbereichen verwenden.
 6. Bloom, Diffusion und Halation zuletzt fein einstellen.
 7. Sensor Grain und Output Mix im 100-Prozent-Zoom beurteilen.
 
 ## Regler
+
+Das native OFX-Panel führt schrittweise durch die Objektiv-Anatomie: Lens State &
+Focus, Distortion & Field, Chromatic Aberration, Defocus & Bokeh / Glass, Flaring &
+Bloom, Vignetting, Dirt & Smudge und abschließend Sensor & Output.
 
 ### Lens State
 
@@ -47,7 +52,8 @@ durch ein reales Objektiv und einen realen Sensor wirkt.
 - `Alpha Depth Gamma`: verteilt die Fokusabstände innerhalb der Depth Map.
 - `Alpha Focus Plane`: die Alpha-Tiefe, die scharf bleiben soll.
 - `Cat-Eye Bokeh`: beschneidet Bokeh zum Bildrand.
-- `Glass Aperture Index`: 1 bis 157 lädt das entsprechende lokale Aperture-JPG.
+- `Glass`: wählt eine integrierte runde, polygonale, anamorphotische, Cat-Eye-
+  oder Vintage-Blendenform ohne Dateipfad.
 
 Wichtig: Wird Alpha als Depth verwendet, bleibt das ursprüngliche Alpha am Ausgang
 erhalten. Für eine separate Depth Map ist später eine Multi-Input-Version sinnvoll.
@@ -66,7 +72,13 @@ erhalten. Für eine separate Depth Map ist später eine Multi-Input-Version sinn
 - `Sensor ISO`: skaliert die Kornenergie relativ zu ISO 400.
 - `Edge Halo Guard`: reduziert Doppelkonturen an harten Silhouetten.
 
-## Lokale Glass-Assets
+### Dirt und Smudge
+
+- `Dirt`: integrierte Staub- oder Oberflächenstruktur.
+- `Smudge`: separate Fingerabdruck-, Wisch- oder Streifenstruktur.
+- Beide Kanäle besitzen eigene Amount- und Scale-Regler.
+
+## Alte lokale Glass-Assets
 
 Der Installationsbefehl kopiert die lizenzierten Bilder nach:
 
@@ -74,16 +86,17 @@ Der Installationsbefehl kopiert die lizenzierten Bilder nach:
 ~/Library/Application Support/Buckswood/OpticsLab/GlassAssets
 ```
 
-Mit dem Ordner-Browser kann auch direkt der ursprüngliche `glass`-Ordner gewählt
-werden. Die bezahlten Aperture-Dateien sind nicht Bestandteil des öffentlichen
-GitHub-Releases.
+V1.2 zeigt keinen Ordner-Browser mehr. Bereits gespeicherte Pfad-, Aperture- und
+Dirt-Indexwerte bleiben aus Kompatibilitätsgründen erhalten und werden verwendet,
+solange die neuen Auswahllisten auf Off stehen. Die bezahlten Aperture-Dateien sind
+nicht Bestandteil des öffentlichen GitHub-Releases.
 
-## Performance in v1.1
+## Performance in v1.2
 
-Inaktive Stufen führen keine unnötigen Nachbarschafts-, CA- oder Mapping-Samples
-mehr aus. Der neutrale Pfad benötigt nur den Originalpixel. Assets bleiben
-dekodiert im Cache; die finale Bildqualität und Tap-Anzahl aktiver Effekte wurden
-nicht reduziert.
+Float32-Renderings verwenden unter macOS die Metal-Puffer von Resolve, einschließlich
+der integrierten Asset-Kanäle. Byte-Renderings oder fehlende GPU-Kontexte verwenden
+den CPU-Fallback im Resolve-Worker-Pool. Es gibt weder FP16 noch reduzierte Tap-Anzahl
+oder Proxy-Auflösung.
 
 ## Grenzen
 
@@ -91,4 +104,5 @@ nicht reduziert.
 - Flare reagiert lokal auf Highlights und ersetzt keine vollständige Lichtquellenanalyse.
 - Aperture-Images gewichten ein hochwertiges Multi-Tap-Bokeh, sind aber noch keine
   FFT-basierte Vollbild-Faltung.
-- GPU-Backends folgen nach der visuellen Validierung des CPU-Referenzpfads.
+- Unter Windows verwendet Optics Lab derzeit den optimierten CPU-Fallback; ein
+  eigener OpenCL-Pfad ist in v1.2 noch nicht enthalten.

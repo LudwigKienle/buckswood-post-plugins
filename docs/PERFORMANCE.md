@@ -9,6 +9,10 @@ by the OpenFX host:
 - Windows NVIDIA and AMD: OpenCL buffer rendering
 - Unsupported hosts, byte images, or unavailable GPU contexts: CPU fallback
 
+Optics Lab v1.2 also uses Resolve's Float32 Metal buffers on macOS. Its Metal
+kernel covers the complete lens/sensor pipeline and the built-in Glass, Dirt,
+and Smudge textures. Windows and byte-image renders retain the CPU fallback.
+
 The other Resolve OFX plugins use Resolve's `OfxMultiThreadSuiteV1` worker
 pool. This avoids creating a new set of operating-system threads for every
 node and frame, and lets Resolve coordinate concurrent clips and nodes.
@@ -33,9 +37,17 @@ the CPU reference:
 | --- | ---: |
 | AI Photorealizer | `0.0000000` |
 | Lens Physics | `0.00000394` |
+| Optics Lab default recipe | `0.00000418` |
+| Optics Lab with Glass/Dirt/Smudge | `0.00000287` |
 
 The test threshold is `0.000005` for Photorealizer and `0.000020` for Lens
-Physics. CPU smoke-test reference values remain unchanged.
+Physics. Optics Lab uses a `0.000050` threshold to cover safe-math
+transcendentals across Metal families. CPU smoke-test reference values remain
+unchanged.
+
+An Optics Lab 960x540 validation run measured 10.57 ms on the CPU worker path
+and 3.50 ms on Metal (3.02x). This is a development-machine result rather than
+a cross-machine guarantee.
 
 ## Measured result
 

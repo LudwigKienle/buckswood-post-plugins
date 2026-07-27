@@ -1,10 +1,22 @@
 # Asset notes
 
+## Built-in v1.2 assets
+
+The public plug-in contains deterministic, code-baked Glass, Dirt, and Smudge
+textures. They are generated once in memory and cached. No file picker, filesystem
+path, download, or third-party image is required for these selectors.
+
+`Lens` remains an algorithmic recipe selector. It does not select an image: each
+recipe combines geometry, aberration, focus, highlight, sensor, and warmth
+coefficients. `Glass` weights the bokeh aperture kernel. `Dirt` and `Smudge` are
+separate transmission/highlight-scatter texture channels.
+
 ## Licensed Glass aperture library
 
 The 157 aperture JPG files are paid packaged content from the user's local Glass
-installation. They are supported through the `Licensed Glass Asset Folder` browser,
-but are not stored in this repository or copied into public builds.
+installation. They remain supported by hidden legacy path/index parameters for
+backward-compatible saved projects, but are not stored in this repository or copied
+into public builds.
 
 Expected layout:
 

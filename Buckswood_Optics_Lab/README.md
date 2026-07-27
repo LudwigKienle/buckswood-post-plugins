@@ -18,14 +18,14 @@ presets, source code, or paid image assets.
 5. Finishing: bloom, diffusion, halation, flare ghosts, anamorphic streak, starburst,
    and vignette.
 6. Sensor: debayer character, chroma detail smear, and ISO-linked animated grain.
-7. Assets: directory browser plus aperture and dirt indices. Images are decoded once
-   and cached for subsequent frames.
+7. Assets: in-plug-in Glass, Dirt, and Smudge selectors with no path entry. The
+   built-in textures are generated once, cached, and reused across frames.
 
 Float renders preserve scene-linear/HDR values above `1.0`. The effect keeps source
 alpha unchanged and includes an edge guard to reduce doubled contours.
 
-V1.1 skips inactive optical stages and avoids redundant samples while preserving
-full output quality.
+V1.2 adds lossless Float32 Metal rendering on macOS, keeps the Resolve worker-pool
+CPU fallback, and retains the full sample count and scene-linear output.
 
 ## Build and test
 
@@ -45,7 +45,7 @@ Build the Windows x64 OFX ZIP with:
 
 If the toolchain is outside the repository, set `LLVM_MINGW_ROOT` to its directory.
 
-## Install with locally licensed Glass assets
+## Optional legacy licensed Glass assets
 
 Quit DaVinci Resolve, then double-click:
 
@@ -60,11 +60,11 @@ The script installs:
 ~/Library/Application Support/Buckswood/OpticsLab/GlassAssets
 ```
 
-It copies the aperture and dirt images only on the licensed user's machine. Those
-paid assets are intentionally excluded from this repository and from public releases.
+The v1.2 UI needs no external folder. This optional helper only preserves access to
+the older 157-image local aperture library for projects that already used its legacy
+indices. Those paid assets remain excluded from public releases.
 
-On Windows, install the bundle into `C:\Program Files\Common Files\OFX\Plugins` and
-select the licensed Glass folder with `Licensed Glass Asset Folder` inside Resolve.
+On Windows, install the bundle into `C:\Program Files\Common Files\OFX\Plugins`.
 
 ## Attribution and independence
 

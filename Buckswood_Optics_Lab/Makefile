@@ -12,16 +12,18 @@ CXX ?= clang++
 ARCHFLAGS ?= -arch arm64 -arch x86_64
 CXXFLAGS := -std=c++17 -O3 -fvisibility=hidden -Wall -Wextra \
 	$(ARCHFLAGS) -Iinclude -Ithird_party -I$(ROOT_DIR)/shared -I$(OFX_INCLUDE)
-LDFLAGS_BUNDLE := -bundle
+LDFLAGS_BUNDLE := -bundle -framework Metal -framework Foundation
 
 CORE_SRC := src/OpticsLabCore.cpp
 ASSET_SRC := src/OpticsAssetLibrary.cpp
 OFX_SRC := src/BuckswoodOpticsLabOFX.cpp
+METAL_SRC := src/OpticsLabMetal.mm
 SMOKE_SRC := src/optics_lab_smoketest.cpp
+METAL_TEST_SRC := src/optics_lab_metal_test.mm
 
-.PHONY: all bundle smoketest descriptor-test licensed-asset-test install install-user clean
+.PHONY: all bundle smoketest metaltest descriptor-test asset-test benchmark licensed-asset-test install install-user clean
 
-all: bundle smoketest descriptor-test
+all: bundle smoketest metaltest descriptor-test asset-test
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -29,8 +31,8 @@ $(BUILD_DIR):
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
 
-$(BUILD_DIR)/$(OFX_BINARY): $(CORE_SRC) $(ASSET_SRC) $(OFX_SRC) | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS_BUNDLE) $(CORE_SRC) $(ASSET_SRC) $(OFX_SRC) -o $@
+$(BUILD_DIR)/$(OFX_BINARY): $(CORE_SRC) $(ASSET_SRC) $(OFX_SRC) $(METAL_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS_BUNDLE) $(CORE_SRC) $(ASSET_SRC) $(OFX_SRC) $(METAL_SRC) -o $@
 
 bundle: $(BUILD_DIR)/$(OFX_BINARY) | $(DIST_DIR)
 	rm -rf $(BUNDLE_DIR)
@@ -45,6 +47,13 @@ $(BUILD_DIR)/optics_lab_smoketest: $(CORE_SRC) $(SMOKE_SRC) | $(BUILD_DIR)
 smoketest: $(BUILD_DIR)/optics_lab_smoketest
 	$(BUILD_DIR)/optics_lab_smoketest
 
+$(BUILD_DIR)/optics_lab_metal_test: $(CORE_SRC) $(ASSET_SRC) $(METAL_SRC) $(METAL_TEST_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -framework Metal -framework Foundation \
+		$(CORE_SRC) $(ASSET_SRC) $(METAL_SRC) $(METAL_TEST_SRC) -o $@
+
+metaltest: $(BUILD_DIR)/optics_lab_metal_test
+	$(BUILD_DIR)/optics_lab_metal_test
+
 $(BUILD_DIR)/ofx_descriptor_smoketest: src/ofx_descriptor_smoketest.cpp | $(BUILD_DIR)
 	$(CXX) -std=c++17 -O2 -I$(OFX_INCLUDE) $< -o $@
 
@@ -55,7 +64,16 @@ descriptor-test: bundle $(BUILD_DIR)/ofx_descriptor_smoketest
 $(BUILD_DIR)/asset_library_smoketest: $(ASSET_SRC) src/asset_library_smoketest.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(ASSET_SRC) src/asset_library_smoketest.cpp -o $@
 
-licensed-asset-test: $(BUILD_DIR)/asset_library_smoketest
+asset-test: $(BUILD_DIR)/asset_library_smoketest
+	$(BUILD_DIR)/asset_library_smoketest
+
+$(BUILD_DIR)/optics_lab_benchmark: $(CORE_SRC) src/optics_lab_benchmark.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(CORE_SRC) src/optics_lab_benchmark.cpp -o $@
+
+benchmark: $(BUILD_DIR)/optics_lab_benchmark
+	$(BUILD_DIR)/optics_lab_benchmark
+
+licensed-asset-test: asset-test
 	@test -n "$(GLASS_ASSET_ROOT)" || \
 		(echo "Set GLASS_ASSET_ROOT=/path/to/glass" && exit 1)
 	$(BUILD_DIR)/asset_library_smoketest "$(GLASS_ASSET_ROOT)"

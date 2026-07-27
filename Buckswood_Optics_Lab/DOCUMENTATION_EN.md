@@ -1,4 +1,4 @@
-# Buckswood Optics Lab v1.1
+# Buckswood Optics Lab v1.2
 
 ## Purpose
 
@@ -11,14 +11,21 @@ digital or AI-generated footage feel photographed rather than mathematically per
 2. Start with `AI Deplastic` or `Large Format Clean`.
 3. Match focal length, f-stop, sensor width, and anamorphic squeeze to the shot.
 4. Add aberrations only until digital perfection starts to disappear.
-5. Use defocus and a Glass aperture only where the image should genuinely be soft.
+5. Choose a built-in `Glass` shape and use defocus only where the image should
+   genuinely be soft.
 6. Balance bloom, diffusion, and halation near the end.
 7. Judge sensor grain and output mix at 100 percent zoom.
 
 ## Main controls
 
+The native OFX panel follows a lens-anatomy sequence without changing the
+underlying processing order: Lens State & Focus, Distortion & Field, Chromatic
+Aberration, Defocus & Bokeh / Glass, Flaring & Bloom, Vignetting, Dirt & Smudge,
+then Sensor & Output. Groups can be collapsed as the look is completed.
+
 ### Lens state
 
+- `Lens` selects a coherent optical recipe rather than a texture.
 - `Focal Length` changes the scale of edge-dependent optical behavior.
 - `F-Stop` strengthens defocus, axial CA, and coma at lower values.
 - `Focus Distance` drives focus breathing.
@@ -46,7 +53,8 @@ digital or AI-generated footage feel photographed rather than mathematically per
 - `Alpha Depth Gamma`: redistributes focus distances within that range.
 - `Alpha Focus Plane`: alpha depth that remains in focus.
 - `Cat-Eye Bokeh`: clips bokeh toward the edge of frame.
-- `Glass Aperture Index`: values 1 through 157 load the matching local aperture JPG.
+- `Glass`: selects a built-in circular, polygonal, anamorphic, cat-eye, or vintage
+  aperture character without any filesystem setup.
 
 Source alpha is preserved at the output. A future multi-input edition can accept a
 separate depth clip without repurposing alpha.
@@ -61,7 +69,14 @@ separate depth clip without repurposing alpha.
 - `Sensor ISO` scales grain energy relative to ISO 400.
 - `Edge Halo Guard` reduces doubled silhouettes and hard contour halos.
 
-## Local Glass assets
+### Dirt and smudge
+
+- `Dirt`: selects a built-in dust or surface-imperfection texture.
+- `Smudge`: independently selects a fingerprint, wipe, or streak texture.
+- Each channel has its own Amount and Scale controls.
+- All built-ins are deterministic and cached; they do not add temporal crawling.
+
+## Legacy local Glass assets
 
 The licensed installer copies the local assets to:
 
@@ -69,14 +84,18 @@ The licensed installer copies the local assets to:
 ~/Library/Application Support/Buckswood/OpticsLab/GlassAssets
 ```
 
-The directory browser can also point directly at an existing `glass` folder. Paid
-aperture images are deliberately excluded from the public GitHub release.
+The v1.2 UI does not expose a path browser. Existing project values for the old
+asset path, aperture index, and dirt index remain serialized and render unchanged
+when the new selectors are Off. Paid aperture images are deliberately excluded
+from the public GitHub release.
 
-## V1.1 performance
+## V1.2 performance
 
-Inactive stages no longer perform unnecessary neighborhood, CA, or mapping
-samples. The neutral path reads only the source pixel, while active effects keep
-their full-quality sample counts. Decoded local assets remain cached.
+macOS Float32 renders use Resolve's Metal buffers, including all built-in asset
+channels. Safe Metal math is compared pixel-by-pixel with the CPU reference.
+Byte renders and unavailable GPU contexts use the Resolve worker-pool CPU path.
+The neutral CPU path returns after its single source read. No path uses FP16,
+reduced tap counts, or proxy resolution.
 
 ## Limitations
 
@@ -84,4 +103,5 @@ their full-quality sample counts. Decoded local assets remain cached.
 - Flare is highlight-local and does not perform global light-source detection.
 - Aperture images weight a multi-tap bokeh kernel; this is not yet a full FFT
   convolution.
-- GPU backends follow after visual validation of the CPU reference implementation.
+- Windows currently uses the optimized CPU fallback; an OpenCL backend is not yet
+  included for Optics Lab.

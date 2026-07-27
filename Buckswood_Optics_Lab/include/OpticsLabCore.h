@@ -45,6 +45,7 @@ struct TextureView {
 struct AssetViews {
     TextureView aperture;
     TextureView dirt;
+    TextureView smudge;
 };
 
 struct Controls {
@@ -96,6 +97,8 @@ struct Controls {
     float apertureInfluence;
     float dirtAmount;
     float dirtScale;
+    float smudgeAmount;
+    float smudgeScale;
 
     float edgeGuard;
     float outputMix;
@@ -152,6 +155,7 @@ public:
         float isoGrainScale;
         bool needsEdgeGuard;
         bool identityMapping;
+        bool identityOutput;
     };
 
     static PreparedState prepare(const FrameInfo& frame, const Controls& controls);
@@ -254,7 +258,8 @@ Pixel OpticsLabCore::processPixel(
     const Pixel dry = sampler.sample(static_cast<float>(x), static_cast<float>(y));
     if (
         state.amount <= 0.000001f ||
-        state.controls.outputMix <= 0.000001f) {
+        state.controls.outputMix <= 0.000001f ||
+        state.identityOutput) {
         return dry;
     }
 
@@ -299,7 +304,7 @@ Pixel OpticsLabCore::processPixel(
             std::fabs(luma(dryDown) - luma(dryUp));
         const float contourRisk =
             smoothstep(0.045f, 0.42f, localGradient);
-        guard = clamp01(c.edgeGuard) * contourRisk;
+        guard = c.edgeGuard * contourRisk;
     }
 
     const float swirlAngle = model.swirl * state.amount * edge2 * 0.24f;
@@ -411,28 +416,24 @@ Pixel OpticsLabCore::processPixel(
 
     float depthError = std::fabs(c.focusOffset);
     if (c.depthSource == 1) {
-        const float nearValue = clamp01(c.depthNear);
-        const float farValue = std::max(
-            nearValue + 0.0001f,
-            clamp01(c.depthFar));
         float depth = clamp01(
-            (clamp01(dry.a) - nearValue) /
-            (farValue - nearValue));
+            (clamp01(dry.a) - c.depthNear) /
+            (c.depthFar - c.depthNear));
         if (c.depthInvert) {
             depth = 1.0f - depth;
         }
         depth = std::pow(
             std::max(0.000001f, depth),
-            clamp(c.depthGamma, 0.10f, 4.0f));
+            c.depthGamma);
         depthError =
-            std::fabs(depth - clamp01(c.focusPlane));
+            std::fabs(depth - c.focusPlane);
     }
     const float defocusStrength =
         model.defocus * state.amount * state.apertureScale *
         clamp01(depthError) * (1.0f - guard * 0.55f);
     if (defocusStrength > 0.0005f) {
         const float radiusPx = std::min(18.0f, 0.75f + defocusStrength * 16.0f);
-        const float squeeze = clamp(c.anamorphicSqueeze, 1.0f, 2.0f);
+        const float squeeze = c.anamorphicSqueeze;
         const float catEye = model.catEye * edge2;
         const float horizontal = radiusPx * squeeze * (1.0f - catEye * 0.18f);
         const float vertical = radiusPx / squeeze * (1.0f - catEye * 0.52f);
@@ -463,7 +464,7 @@ Pixel OpticsLabCore::processPixel(
                 weight =
                     1.0f +
                     (0.15f + apertureWeight * 1.70f - 1.0f) *
-                    clamp01(c.apertureInfluence);
+                    c.apertureInfluence;
             }
             blur.r += p.r * weight;
             blur.g += p.g * weight;
@@ -593,12 +594,12 @@ Pixel OpticsLabCore::processPixel(
     result.b *= vignetteGain;
 
     if (assets && assets->dirt.valid() && c.dirtAmount > 0.0001f) {
-        const float scale = clamp(c.dirtScale, 0.25f, 8.0f);
+        const float scale = c.dirtScale;
         const float u = std::fmod((static_cast<float>(x) + 0.5f) / state.width * scale, 1.0f);
         const float v = std::fmod((static_cast<float>(y) + 0.5f) / state.height * scale, 1.0f);
         const float dirt = clamp01(assets->dirt.sample(u, v));
         const float hot = smoothstep(c.bloomThreshold * 0.72f, c.bloomThreshold + 0.90f, dryY);
-        const float dirtMask = dirt * clamp01(c.dirtAmount) * state.amount;
+        const float dirtMask = dirt * c.dirtAmount * state.amount;
         const float transmission = 1.0f - dirtMask * (0.10f + hot * 0.24f);
         result.r *= transmission;
         result.g *= transmission;
@@ -608,10 +609,29 @@ Pixel OpticsLabCore::processPixel(
         result.b += dirtMask * hot * 0.010f;
     }
 
+    if (assets && assets->smudge.valid() && c.smudgeAmount > 0.0001f) {
+        const float scale = c.smudgeScale;
+        const float u = std::fmod((static_cast<float>(x) + 0.5f) / state.width * scale, 1.0f);
+        const float v = std::fmod((static_cast<float>(y) + 0.5f) / state.height * scale, 1.0f);
+        const float smudge = clamp01(assets->smudge.sample(u, v));
+        const float hot = smoothstep(c.bloomThreshold * 0.68f, c.bloomThreshold + 0.82f, dryY);
+        const float smudgeMask =
+            smudge * c.smudgeAmount * state.amount;
+        const float transmission =
+            1.0f - smudgeMask * (0.07f + hot * 0.18f);
+        result.r *= transmission;
+        result.g *= transmission;
+        result.b *= transmission;
+        result.r +=
+            smudgeMask * hot * 0.024f * (1.0f + model.warmth * 0.5f);
+        result.g += smudgeMask * hot * 0.019f;
+        result.b += smudgeMask * hot * 0.016f;
+    }
+
     const float grainStrength =
         model.grain * state.amount * state.isoGrainScale;
     if (grainStrength > 0.0001f) {
-        const float size = clamp(c.grainSize, 0.5f, 4.0f);
+        const float size = c.grainSize;
         const int grainX = static_cast<int>(static_cast<float>(x) / size);
         const int grainY = static_cast<int>(static_cast<float>(y) / size);
         const float mono = hashNoise(grainX, grainY, state.frameIndex, c.grainSeed);
@@ -624,7 +644,7 @@ Pixel OpticsLabCore::processPixel(
         result.b += noise * amount * 1.08f;
     }
 
-    const float finalMix = clamp01(c.outputMix);
+    const float finalMix = c.outputMix;
     result = mix(dry, result, finalMix);
     result.a = dry.a;
     return sanitize(result, dry);

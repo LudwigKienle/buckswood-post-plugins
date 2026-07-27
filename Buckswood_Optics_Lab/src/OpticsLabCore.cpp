@@ -6,6 +6,29 @@ OpticsLabCore::PreparedState OpticsLabCore::prepare(
     const FrameInfo& frame,
     const Controls& controls)
 {
+    Controls preparedControls = controls;
+    preparedControls.edgeGuard = clamp01(controls.edgeGuard);
+    preparedControls.outputMix = clamp01(controls.outputMix);
+    preparedControls.depthNear = clamp01(controls.depthNear);
+    preparedControls.depthFar = std::max(
+        preparedControls.depthNear + 0.0001f,
+        clamp01(controls.depthFar));
+    preparedControls.depthGamma =
+        clamp(controls.depthGamma, 0.10f, 4.0f);
+    preparedControls.focusPlane = clamp01(controls.focusPlane);
+    preparedControls.anamorphicSqueeze =
+        clamp(controls.anamorphicSqueeze, 1.0f, 2.0f);
+    preparedControls.apertureInfluence =
+        clamp01(controls.apertureInfluence);
+    preparedControls.dirtAmount = clamp01(controls.dirtAmount);
+    preparedControls.dirtScale =
+        clamp(controls.dirtScale, 0.25f, 8.0f);
+    preparedControls.smudgeAmount = clamp01(controls.smudgeAmount);
+    preparedControls.smudgeScale =
+        clamp(controls.smudgeScale, 0.25f, 8.0f);
+    preparedControls.grainSize =
+        clamp(controls.grainSize, 0.5f, 4.0f);
+
     Model model = modelForPreset(controls.preset);
     model.distortion += controls.distortion * 0.16f;
     model.breathing += controls.breathing;
@@ -58,10 +81,31 @@ OpticsLabCore::PreparedState OpticsLabCore::prepare(
         std::fabs(model.distortion * amount) <= 0.000001f &&
         std::fabs(model.swirl * amount) <= 0.000001f &&
         std::fabs(breathingScale - 1.0f) <= 0.000001f;
+    const bool identityOutput =
+        identityMapping &&
+        model.lateralCA == 0.0f &&
+        model.axialCA == 0.0f &&
+        model.coma == 0.0f &&
+        model.astigmatism == 0.0f &&
+        model.fieldCurvature == 0.0f &&
+        model.spherical == 0.0f &&
+        model.defocus == 0.0f &&
+        model.bloom == 0.0f &&
+        model.diffusion == 0.0f &&
+        model.halation == 0.0f &&
+        model.flareGhosts == 0.0f &&
+        model.flareStreak == 0.0f &&
+        model.starburst == 0.0f &&
+        model.vignette == 0.0f &&
+        model.debayer == 0.0f &&
+        model.chromaSmear == 0.0f &&
+        model.grain == 0.0f &&
+        preparedControls.dirtAmount <= 0.0001f &&
+        preparedControls.smudgeAmount <= 0.0001f;
 
     return PreparedState{
         model,
-        controls,
+        preparedControls,
         width,
         height,
         frame.frameIndex,
@@ -79,6 +123,7 @@ OpticsLabCore::PreparedState OpticsLabCore::prepare(
             400.0f),
         needsEdgeGuard,
         identityMapping,
+        identityOutput,
     };
 }
 

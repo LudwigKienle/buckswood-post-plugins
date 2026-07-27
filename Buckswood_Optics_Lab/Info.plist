@@ -11,12 +11,12 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-  <string>Buckswood Optics Lab v1.1</string>
+  <string>Buckswood Optics Lab v1.2</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
     <key>CFBundleShortVersionString</key>
-  <string>1.1.0</string>
+  <string>1.2.0</string>
     <key>CFBundleVersion</key>
-  <string>1.1.0</string>
+  <string>1.2.0</string>
 </dict>
 </plist>

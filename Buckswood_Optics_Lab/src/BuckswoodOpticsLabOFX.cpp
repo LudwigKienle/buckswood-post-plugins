@@ -8,7 +8,11 @@
 #include "OpticsAssetLibrary.h"
 #include "OpticsLabCore.h"
 #include "OfxRenderRuntime.h"
+#if defined(__APPLE__)
+#include "OpticsLabMetal.h"
+#endif
 
+#include "ofxGPURender.h"
 #include "ofxImageEffect.h"
 #include "ofxMultiThread.h"
 #include "ofxParam.h"
@@ -32,7 +36,7 @@ OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.optics.lab";
 constexpr int kPluginMajorVersion = 1;
-constexpr int kPluginMinorVersion = 1;
+constexpr int kPluginMinorVersion = 2;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -58,6 +62,28 @@ bool readImageInfo(OfxPropertySetHandle image, ImageInfo& info)
            gPropHost->propGetIntN(image, kOfxImagePropBounds, 4, &info.bounds.x1) == kOfxStatOK &&
            gPropHost->propGetString(image, kOfxImageEffectPropPixelDepth, 0, &info.pixelDepth) == kOfxStatOK;
 }
+
+#if defined(__APPLE__)
+buckswood::gpu::PixelFormat gpuPixelFormat(const char* pixelDepth)
+{
+    return std::strcmp(pixelDepth, kOfxBitDepthFloat) == 0
+        ? buckswood::gpu::PixelFormat::Float32
+        : buckswood::gpu::PixelFormat::Byte;
+}
+
+buckswood::gpu::ImageBuffer gpuImageBuffer(const ImageInfo& info)
+{
+    return buckswood::gpu::ImageBuffer{
+        info.data,
+        info.rowBytes,
+        info.bounds.x1,
+        info.bounds.y1,
+        info.bounds.x2,
+        info.bounds.y2,
+        gpuPixelFormat(info.pixelDepth),
+    };
+}
+#endif
 
 float clamp01(float value)
 {
@@ -175,6 +201,8 @@ buckswood_optics::Controls controlsAtTime(OfxImageEffectHandle instance, OfxTime
     c.apertureInfluence = static_cast<float>(doubleParamAtTime(instance, "apertureInfluence", time, 0.85));
     c.dirtAmount = static_cast<float>(doubleParamAtTime(instance, "dirtAmount", time, 0.0));
     c.dirtScale = static_cast<float>(doubleParamAtTime(instance, "dirtScale", time, 1.0));
+    c.smudgeAmount = static_cast<float>(doubleParamAtTime(instance, "smudgeAmount", time, 0.0));
+    c.smudgeScale = static_cast<float>(doubleParamAtTime(instance, "smudgeScale", time, 1.0));
 
     c.edgeGuard = static_cast<float>(doubleParamAtTime(instance, "edgeGuard", time, 0.80));
     c.outputMix = static_cast<float>(doubleParamAtTime(instance, "outputMix", time, 0.65));
@@ -195,18 +223,11 @@ public:
     }
 
 private:
-    buckswood_optics::Pixel read(int x, int y) const
-    {
-        x = std::min(info_.bounds.x2 - 1, std::max(info_.bounds.x1, x));
-        y = std::min(info_.bounds.y2 - 1, std::max(info_.bounds.y1, y));
-        auto* p = pixelAddress(base_, info_.bounds, x, y, info_.rowBytes);
-        return p
-            ? buckswood_optics::Pixel{p->r, p->g, p->b, p->a}
-            : buckswood_optics::Pixel{0.0f, 0.0f, 0.0f, 0.0f};
-    }
-
     buckswood_optics::Pixel bilinear(float x, float y) const
     {
+        if (!base_) {
+            return buckswood_optics::Pixel{0.0f, 0.0f, 0.0f, 0.0f};
+        }
         const float safeX = std::min(
             static_cast<float>(info_.bounds.x2 - 1),
             std::max(static_cast<float>(info_.bounds.x1), x));
@@ -219,10 +240,16 @@ private:
         const int y1 = std::min(info_.bounds.y2 - 1, y0 + 1);
         const float tx = safeX - static_cast<float>(x0);
         const float ty = safeY - static_cast<float>(y0);
-        const auto p00 = read(x0, y0);
-        const auto p10 = read(x1, y0);
-        const auto p01 = read(x0, y1);
-        const auto p11 = read(x1, y1);
+        const auto* row0 = reinterpret_cast<const OfxRGBAColourF*>(
+            reinterpret_cast<const char*>(base_) +
+            (y0 - info_.bounds.y1) * info_.rowBytes);
+        const auto* row1 = reinterpret_cast<const OfxRGBAColourF*>(
+            reinterpret_cast<const char*>(base_) +
+            (y1 - info_.bounds.y1) * info_.rowBytes);
+        const auto& p00 = row0[x0 - info_.bounds.x1];
+        const auto& p10 = row0[x1 - info_.bounds.x1];
+        const auto& p01 = row1[x0 - info_.bounds.x1];
+        const auto& p11 = row1[x1 - info_.bounds.x1];
         const float u = 1.0f - tx;
         const float v = 1.0f - ty;
         return buckswood_optics::Pixel{
@@ -253,7 +280,13 @@ public:
         const int iy = std::min(
             info_.bounds.y2 - 1,
             std::max(info_.bounds.y1, static_cast<int>(std::floor(y + 0.5f))));
-        auto* p = pixelAddress(base_, info_.bounds, ix, iy, info_.rowBytes);
+        if (!base_) {
+            return buckswood_optics::Pixel{0.0f, 0.0f, 0.0f, 0.0f};
+        }
+        const auto* row = reinterpret_cast<const OfxRGBAColourB*>(
+            reinterpret_cast<const char*>(base_) +
+            (iy - info_.bounds.y1) * info_.rowBytes);
+        const auto* p = row + (ix - info_.bounds.x1);
         return p
             ? buckswood_optics::Pixel{
                 p->r / 255.0f,
@@ -289,10 +322,10 @@ OfxStatus renderTyped(
                 break;
             }
             auto* dstPix = pixelAddress(dst, dstInfo.bounds, renderWindow.x1, y, dstInfo.rowBytes);
+            if (!dstPix) {
+                continue;
+            }
             for (int x = renderWindow.x1; x < renderWindow.x2; ++x) {
-                if (!dstPix) {
-                    continue;
-                }
                 const auto out = buckswood_optics::OpticsLabCore::processPixel(
                     sampler,
                     x,
@@ -328,6 +361,22 @@ OfxStatus render(OfxImageEffectHandle instance, OfxPropertySetHandle inArgs)
     OfxRectI renderWindow{0, 0, 0, 0};
     gPropHost->propGetDouble(inArgs, kOfxPropTime, 0, &time);
     gPropHost->propGetIntN(inArgs, kOfxImageEffectPropRenderWindow, 4, &renderWindow.x1);
+#if defined(__APPLE__)
+    int metalEnabled = 0;
+    void* metalCommandQueue = nullptr;
+    gPropHost->propGetInt(
+        inArgs,
+        kOfxImageEffectPropMetalEnabled,
+        0,
+        &metalEnabled);
+    if (metalEnabled) {
+        gPropHost->propGetPointer(
+            inArgs,
+            kOfxImageEffectPropMetalCommandQueue,
+            0,
+            &metalCommandQueue);
+    }
+#endif
 
     OfxImageClipHandle outputClip = nullptr;
     OfxImageClipHandle sourceClip = nullptr;
@@ -355,13 +404,22 @@ OfxStatus render(OfxImageEffectHandle instance, OfxPropertySetHandle inArgs)
     }
 
     const auto controls = controlsAtTime(instance, time);
-    const std::string assetRoot = stringParamAtTime(instance, "glassAssetRoot", time, "");
+    std::string assetRoot = stringParamAtTime(instance, "glassAssetRoot", time, "");
+    if (assetRoot.empty()) {
+        assetRoot = buckswood_optics::OpticsAssetLibrary::defaultAssetRoot();
+    }
     const int apertureIndex = intParamAtTime(instance, "apertureIndex", time, 0);
     const int dirtIndex = intParamAtTime(instance, "dirtIndex", time, 0);
+    const int glassAsset = intParamAtTime(instance, "glassAsset", time, 0);
+    const int dirtAsset = intParamAtTime(instance, "dirtAsset", time, 0);
+    const int smudgeAsset = intParamAtTime(instance, "smudgeAsset", time, 0);
     const auto loadedAssets = buckswood_optics::OpticsAssetLibrary::load(
         assetRoot,
         apertureIndex,
-        dirtIndex);
+        dirtIndex,
+        glassAsset,
+        dirtAsset,
+        smudgeAsset);
     const auto assetViews = loadedAssets.views();
     const buckswood_optics::FrameInfo frame{
         dstInfo.bounds.x2 - dstInfo.bounds.x1,
@@ -369,7 +427,30 @@ OfxStatus render(OfxImageEffectHandle instance, OfxPropertySetHandle inArgs)
         static_cast<int>(std::floor(time + 0.5)),
     };
 
-    if (std::strcmp(dstInfo.pixelDepth, kOfxBitDepthFloat) == 0 &&
+    if (
+#if defined(__APPLE__)
+        metalEnabled &&
+#endif
+        std::strcmp(dstInfo.pixelDepth, kOfxBitDepthFloat) == 0 &&
+        std::strcmp(srcInfo.pixelDepth, kOfxBitDepthFloat) == 0) {
+#if defined(__APPLE__)
+        const auto prepared =
+            buckswood_optics::OpticsLabCore::prepare(frame, controls);
+        const bool queued = buckswood_optics::runOpticsLabMetal(
+            metalCommandQueue,
+            gpuImageBuffer(srcInfo),
+            gpuImageBuffer(dstInfo),
+            buckswood::gpu::RenderWindow{
+                renderWindow.x1,
+                renderWindow.y1,
+                renderWindow.x2,
+                renderWindow.y2,
+            },
+            prepared,
+            assetViews);
+        status = queued ? kOfxStatOK : kOfxStatFailed;
+#endif
+    } else if (std::strcmp(dstInfo.pixelDepth, kOfxBitDepthFloat) == 0 &&
         std::strcmp(srcInfo.pixelDepth, kOfxBitDepthFloat) == 0) {
         status = renderTyped<OfxRGBAColourF, FloatSampler>(
             instance,
@@ -398,6 +479,36 @@ OfxStatus render(OfxImageEffectHandle instance, OfxPropertySetHandle inArgs)
     return status;
 }
 
+void placeParam(
+    OfxPropertySetHandle props,
+    const char* name,
+    int pageIndex,
+    OfxPropertySetHandle page,
+    const char* parent,
+    const char* hint)
+{
+    if (parent && *parent) {
+        gPropHost->propSetString(props, kOfxParamPropParent, 0, parent);
+    }
+    if (hint && *hint) {
+        gPropHost->propSetString(props, kOfxParamPropHint, 0, hint);
+    }
+    gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
+}
+
+void defineGroupParam(
+    OfxParamSetHandle paramSet,
+    const char* name,
+    const char* label,
+    bool open)
+{
+    OfxPropertySetHandle props = nullptr;
+    gParamHost->paramDefine(paramSet, kOfxParamTypeGroup, name, &props);
+    gPropHost->propSetString(props, kOfxParamPropScriptName, 0, name);
+    gPropHost->propSetString(props, kOfxPropLabel, 0, label);
+    gPropHost->propSetInt(props, kOfxParamPropGroupOpen, 0, open ? 1 : 0);
+}
+
 void defineDoubleParam(
     OfxParamSetHandle paramSet,
     const char* name,
@@ -406,7 +517,9 @@ void defineDoubleParam(
     double minValue,
     double maxValue,
     int pageIndex,
-    OfxPropertySetHandle page)
+    OfxPropertySetHandle page,
+    const char* parent = nullptr,
+    const char* hint = nullptr)
 {
     OfxPropertySetHandle props = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypeDouble, name, &props);
@@ -418,7 +531,7 @@ void defineDoubleParam(
     gPropHost->propSetDouble(props, kOfxParamPropMax, 0, maxValue);
     gPropHost->propSetDouble(props, kOfxParamPropDisplayMin, 0, minValue);
     gPropHost->propSetDouble(props, kOfxParamPropDisplayMax, 0, maxValue);
-    gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
+    placeParam(props, name, pageIndex, page, parent, hint);
 }
 
 void defineIntegerParam(
@@ -429,7 +542,10 @@ void defineIntegerParam(
     int minValue,
     int maxValue,
     int pageIndex,
-    OfxPropertySetHandle page)
+    OfxPropertySetHandle page,
+    const char* parent = nullptr,
+    const char* hint = nullptr,
+    bool secret = false)
 {
     OfxPropertySetHandle props = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypeInteger, name, &props);
@@ -440,7 +556,10 @@ void defineIntegerParam(
     gPropHost->propSetInt(props, kOfxParamPropMax, 0, maxValue);
     gPropHost->propSetInt(props, kOfxParamPropDisplayMin, 0, minValue);
     gPropHost->propSetInt(props, kOfxParamPropDisplayMax, 0, maxValue);
-    gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
+    if (secret) {
+        gPropHost->propSetInt(props, kOfxParamPropSecret, 0, 1);
+    }
+    placeParam(props, name, pageIndex, page, parent, hint);
 }
 
 void defineChoiceParam(
@@ -451,7 +570,9 @@ void defineChoiceParam(
     const char* const* options,
     int optionCount,
     int pageIndex,
-    OfxPropertySetHandle page)
+    OfxPropertySetHandle page,
+    const char* parent = nullptr,
+    const char* hint = nullptr)
 {
     OfxPropertySetHandle props = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypeChoice, name, &props);
@@ -461,7 +582,7 @@ void defineChoiceParam(
     for (int i = 0; i < optionCount; ++i) {
         gPropHost->propSetString(props, kOfxParamPropChoiceOption, i, options[i]);
     }
-    gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
+    placeParam(props, name, pageIndex, page, parent, hint);
 }
 
 void defineBooleanParam(
@@ -470,14 +591,16 @@ void defineBooleanParam(
     const char* label,
     int defaultValue,
     int pageIndex,
-    OfxPropertySetHandle page)
+    OfxPropertySetHandle page,
+    const char* parent = nullptr,
+    const char* hint = nullptr)
 {
     OfxPropertySetHandle props = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypeBoolean, name, &props);
     gPropHost->propSetString(props, kOfxParamPropScriptName, 0, name);
     gPropHost->propSetString(props, kOfxPropLabel, 0, label);
     gPropHost->propSetInt(props, kOfxParamPropDefault, 0, defaultValue);
-    gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
+    placeParam(props, name, pageIndex, page, parent, hint);
 }
 
 void defineDirectoryParam(
@@ -486,7 +609,8 @@ void defineDirectoryParam(
     const char* label,
     const char* defaultValue,
     int pageIndex,
-    OfxPropertySetHandle page)
+    OfxPropertySetHandle page,
+    bool secret = false)
 {
     OfxPropertySetHandle props = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypeString, name, &props);
@@ -494,7 +618,10 @@ void defineDirectoryParam(
     gPropHost->propSetString(props, kOfxPropLabel, 0, label);
     gPropHost->propSetString(props, kOfxParamPropStringMode, 0, kOfxParamStringIsDirectoryPath);
     gPropHost->propSetString(props, kOfxParamPropDefault, 0, defaultValue);
-    gPropHost->propSetString(page, kOfxParamPropPageChild, pageIndex, name);
+    if (secret) {
+        gPropHost->propSetInt(props, kOfxParamPropSecret, 0, 1);
+    }
+    placeParam(props, name, pageIndex, page, nullptr, nullptr);
 }
 
 OfxStatus describeInContext(OfxImageEffectHandle effect)
@@ -509,9 +636,26 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     gEffectHost->getParamSet(effect, &paramSet);
     OfxPropertySetHandle page = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypePage, "Main", &page);
-    gPropHost->propSetString(page, kOfxPropLabel, 0, "Optics Lab");
+    gPropHost->propSetString(page, kOfxPropLabel, 0, "Optics Lab v1.2");
 
     int p = 0;
+    constexpr const char* kLensGroup = "lensGroup";
+    constexpr const char* kDistortionGroup = "distortionGroup";
+    constexpr const char* kChromaticGroup = "chromaticGroup";
+    constexpr const char* kGlassGroup = "glassGroup";
+    constexpr const char* kLightGroup = "lightGroup";
+    constexpr const char* kVignetteGroup = "vignetteGroup";
+    constexpr const char* kSurfaceGroup = "surfaceGroup";
+    constexpr const char* kSensorGroup = "sensorGroup";
+    defineGroupParam(paramSet, kLensGroup, "01  Lens State & Focus", true);
+    defineGroupParam(paramSet, kDistortionGroup, "02  Distortion & Field", true);
+    defineGroupParam(paramSet, kChromaticGroup, "03  Chromatic Aberration", true);
+    defineGroupParam(paramSet, kGlassGroup, "04  Defocus & Bokeh / Glass", true);
+    defineGroupParam(paramSet, kLightGroup, "05  Flaring & Bloom", true);
+    defineGroupParam(paramSet, kVignetteGroup, "06  Vignetting", true);
+    defineGroupParam(paramSet, kSurfaceGroup, "07  Dirt & Smudge", true);
+    defineGroupParam(paramSet, kSensorGroup, "08  Sensor & Output", false);
+
     const char* presets[] = {
         "Neutral / Manual",
         "Modern Cinema",
@@ -523,72 +667,213 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
         "Large Format Clean",
         "Dream Diffusion",
     };
-    defineChoiceParam(paramSet, "preset", "Optical Preset", 6, presets, 9, p++, page);
-    defineDoubleParam(paramSet, "effectStrength", "Effect Strength", 0.65, 0.0, 1.0, p++, page);
+    defineChoiceParam(
+        paramSet, "preset", "Lens", 6, presets, 9, p++, page, kLensGroup,
+        "Selects a coherent optical recipe. The controls below remain available as trims.");
+    defineDoubleParam(
+        paramSet, "effectStrength", "Lens Strength", 0.65, 0.0, 1.0,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "focalLength", "Focal Length (mm)", 50.0, 8.0, 300.0,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "fStop", "F-Stop", 2.8, 0.7, 32.0,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "focusDistance", "Focus Distance (m)", 3.0, 0.2, 1000.0,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "breathing", "Focus Breathing", 0.0, -1.0, 1.0,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "sensorWidth", "Sensor Width (mm)", 36.0, 8.0, 70.0,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "anamorphicSqueeze", "Anamorphic Squeeze", 1.0, 1.0, 2.0,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "anamorphicAngle", "Anamorphic Axis (Degrees)", 0.0, -180.0, 180.0,
+        p++, page, kLensGroup);
 
-    defineDoubleParam(paramSet, "focalLength", "Focal Length (mm)", 50.0, 8.0, 300.0, p++, page);
-    defineDoubleParam(paramSet, "fStop", "F-Stop", 2.8, 0.7, 32.0, p++, page);
-    defineDoubleParam(paramSet, "focusDistance", "Focus Distance (m)", 3.0, 0.2, 1000.0, p++, page);
-    defineDoubleParam(paramSet, "sensorWidth", "Sensor Width (mm)", 36.0, 8.0, 70.0, p++, page);
-    defineDoubleParam(paramSet, "anamorphicSqueeze", "Anamorphic Squeeze", 1.0, 1.0, 2.0, p++, page);
-    defineDoubleParam(paramSet, "anamorphicAngle", "Anamorphic Axis (Degrees)", 0.0, -180.0, 180.0, p++, page);
-
-    defineDoubleParam(paramSet, "distortion", "Distortion Trim", 0.0, -1.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "breathing", "Focus Breathing", 0.0, -1.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "lateralCA", "Lateral CA", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "axialCA", "Axial CA", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "coma", "Coma", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "astigmatism", "Astigmatism", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "fieldCurvature", "Field Curvature", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "spherical", "Spherical Aberration", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "swirl", "Swirl", 0.0, 0.0, 1.0, p++, page);
+    const char* glassAssets[] = {
+        "Off / Legacy Selection",
+        "Clean Circular",
+        "Six-Blade Hexagon",
+        "Eight-Blade Octagon",
+        "Anamorphic Oval 1.5x",
+        "Anamorphic Oval 2.0x",
+        "Cat-Eye Oval",
+        "Vintage Scalloped",
+    };
+    defineChoiceParam(
+        paramSet, "glassAsset", "Glass", 0, glassAssets, 8,
+        p++, page, kGlassGroup,
+        "Built-in aperture character. No external asset folder is required.");
+    defineDoubleParam(
+        paramSet, "apertureInfluence", "Glass Influence", 0.85, 0.0, 1.0,
+        p++, page, kGlassGroup);
 
     const char* depthSources[] = {"Uniform Focus Offset", "Source Alpha as Depth"};
-    defineChoiceParam(paramSet, "depthSource", "Depth Source", 0, depthSources, 2, p++, page);
-    defineBooleanParam(paramSet, "depthInvert", "Invert Alpha Depth", 0, p++, page);
-    defineDoubleParam(paramSet, "depthNear", "Alpha Depth Near", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "depthFar", "Alpha Depth Far", 1.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "depthGamma", "Alpha Depth Gamma", 1.0, 0.10, 4.0, p++, page);
-    defineDoubleParam(paramSet, "focusPlane", "Alpha Focus Plane", 0.5, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "focusOffset", "Uniform Focus Offset", 0.0, -1.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "defocus", "Defocus", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "catEye", "Cat-Eye Bokeh", 0.0, 0.0, 1.0, p++, page);
+    defineChoiceParam(
+        paramSet, "depthSource", "Depth Source", 0, depthSources, 2,
+        p++, page, kGlassGroup);
+    defineBooleanParam(
+        paramSet, "depthInvert", "Invert Alpha Depth", 0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "depthNear", "Alpha Depth Near", 0.0, 0.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "depthFar", "Alpha Depth Far", 1.0, 0.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "depthGamma", "Alpha Depth Gamma", 1.0, 0.10, 4.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "focusPlane", "Alpha Focus Plane", 0.5, 0.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "focusOffset", "Uniform Focus Offset", 0.0, -1.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "defocus", "Defocus", 0.0, 0.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "catEye", "Cat-Eye Bokeh", 0.0, 0.0, 1.0,
+        p++, page, kGlassGroup);
 
-    defineDoubleParam(paramSet, "bloom", "Bloom", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "bloomThreshold", "Highlight Threshold", 0.82, 0.0, 4.0, p++, page);
-    defineDoubleParam(paramSet, "diffusion", "Diffusion", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "halation", "Halation", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "flareGhosts", "Flare Ghosts", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "flareStreak", "Anamorphic Streak", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "starburst", "Starburst", 0.0, 0.0, 1.0, p++, page);
+    defineDoubleParam(
+        paramSet, "distortion", "Distortion Trim", 0.0, -1.0, 1.0,
+        p++, page, kDistortionGroup);
+    defineDoubleParam(
+        paramSet, "fieldCurvature", "Field Curvature", 0.0, 0.0, 1.0,
+        p++, page, kDistortionGroup);
+    defineDoubleParam(
+        paramSet, "swirl", "Swirl", 0.0, 0.0, 1.0,
+        p++, page, kDistortionGroup);
+    defineDoubleParam(
+        paramSet, "lateralCA", "Lateral CA", 0.0, 0.0, 1.0,
+        p++, page, kChromaticGroup);
+    defineDoubleParam(
+        paramSet, "axialCA", "Axial CA", 0.0, 0.0, 1.0,
+        p++, page, kChromaticGroup);
+    defineDoubleParam(
+        paramSet, "coma", "Coma", 0.0, 0.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "astigmatism", "Astigmatism", 0.0, 0.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "spherical", "Spherical Aberration", 0.0, 0.0, 1.0,
+        p++, page, kGlassGroup);
 
-    defineDoubleParam(paramSet, "vignette", "Vignette", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "debayer", "Sensor Debayer Character", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "chromaSmear", "Chroma Detail Smear", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "grain", "Sensor Grain", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "grainSize", "Grain Size", 1.0, 0.5, 4.0, p++, page);
-    defineDoubleParam(paramSet, "grainSeed", "Grain Seed", 1.0, 0.0, 1000.0, p++, page);
-    defineDoubleParam(paramSet, "sensorISO", "Sensor ISO", 400.0, 50.0, 12800.0, p++, page);
+    defineDoubleParam(
+        paramSet, "bloom", "Bloom", 0.0, 0.0, 1.0,
+        p++, page, kLightGroup);
+    defineDoubleParam(
+        paramSet, "bloomThreshold", "Highlight Threshold", 0.82, 0.0, 4.0,
+        p++, page, kLightGroup);
+    defineDoubleParam(
+        paramSet, "diffusion", "Diffusion", 0.0, 0.0, 1.0,
+        p++, page, kLightGroup);
+    defineDoubleParam(
+        paramSet, "halation", "Halation", 0.0, 0.0, 1.0,
+        p++, page, kLightGroup);
+    defineDoubleParam(
+        paramSet, "flareGhosts", "Flare Ghosts", 0.0, 0.0, 1.0,
+        p++, page, kLightGroup);
+    defineDoubleParam(
+        paramSet, "flareStreak", "Anamorphic Streak", 0.0, 0.0, 1.0,
+        p++, page, kLightGroup);
+    defineDoubleParam(
+        paramSet, "starburst", "Starburst", 0.0, 0.0, 1.0,
+        p++, page, kLightGroup);
 
+    const char* dirtAssets[] = {
+        "Off / Legacy Selection",
+        "Fine Dust",
+        "Coarse Dust",
+        "Clean-Room Flecks",
+        "Edge Dust",
+        "Organic Specks",
+    };
+    const char* smudgeAssets[] = {
+        "Off",
+        "Soft Fingerprint",
+        "Dense Fingerprint",
+        "Wipe Arc",
+        "Streaked Glass",
+    };
+    defineChoiceParam(
+        paramSet, "dirtAsset", "Dirt", 0, dirtAssets, 6,
+        p++, page, kSurfaceGroup,
+        "Built-in deterministic dirt texture; selecting Off preserves legacy projects.");
+    defineDoubleParam(
+        paramSet, "dirtAmount", "Dirt Amount", 0.0, 0.0, 1.0,
+        p++, page, kSurfaceGroup);
+    defineDoubleParam(
+        paramSet, "dirtScale", "Dirt Scale", 1.0, 0.25, 8.0,
+        p++, page, kSurfaceGroup);
+    defineChoiceParam(
+        paramSet, "smudgeAsset", "Smudge", 0, smudgeAssets, 5,
+        p++, page, kSurfaceGroup,
+        "Independent built-in fingerprint or wipe texture.");
+    defineDoubleParam(
+        paramSet, "smudgeAmount", "Smudge Amount", 0.0, 0.0, 1.0,
+        p++, page, kSurfaceGroup);
+    defineDoubleParam(
+        paramSet, "smudgeScale", "Smudge Scale", 1.0, 0.25, 8.0,
+        p++, page, kSurfaceGroup);
+
+    defineDoubleParam(
+        paramSet, "vignette", "Vignette", 0.0, 0.0, 1.0,
+        p++, page, kVignetteGroup);
+    defineDoubleParam(
+        paramSet, "debayer", "Sensor Debayer Character", 0.0, 0.0, 1.0,
+        p++, page, kSensorGroup);
+    defineDoubleParam(
+        paramSet, "chromaSmear", "Chroma Detail Smear", 0.0, 0.0, 1.0,
+        p++, page, kSensorGroup);
+    defineDoubleParam(
+        paramSet, "grain", "Sensor Grain", 0.0, 0.0, 1.0,
+        p++, page, kSensorGroup);
+    defineDoubleParam(
+        paramSet, "grainSize", "Grain Size", 1.0, 0.5, 4.0,
+        p++, page, kSensorGroup);
+    defineDoubleParam(
+        paramSet, "grainSeed", "Grain Seed", 1.0, 0.0, 1000.0,
+        p++, page, kSensorGroup);
+    defineDoubleParam(
+        paramSet, "sensorISO", "Sensor ISO", 400.0, 50.0, 12800.0,
+        p++, page, kSensorGroup);
+
+    defineDoubleParam(
+        paramSet, "edgeGuard", "Edge Halo Guard", 0.80, 0.0, 1.0,
+        p++, page, kSensorGroup);
+    defineDoubleParam(
+        paramSet, "outputMix", "Output Mix", 0.65, 0.0, 1.0,
+        p++, page, kSensorGroup);
+
+    // Kept serialized and readable for existing projects, but intentionally hidden
+    // from the v1.2 UI. Choice value 0 above falls back to these parameters.
     defineDirectoryParam(
         paramSet,
         "glassAssetRoot",
-        "Licensed Glass Asset Folder",
+        "Legacy Glass Asset Folder",
 #if defined(_WIN32)
         "",
 #else
         "~/Library/Application Support/Buckswood/OpticsLab/GlassAssets",
 #endif
         p++,
-        page);
-    defineIntegerParam(paramSet, "apertureIndex", "Glass Aperture Index", 0, 0, 157, p++, page);
-    defineDoubleParam(paramSet, "apertureInfluence", "Aperture Influence", 0.85, 0.0, 1.0, p++, page);
-    defineIntegerParam(paramSet, "dirtIndex", "Glass Dirt Index", 0, 0, 8, p++, page);
-    defineDoubleParam(paramSet, "dirtAmount", "Dirt Amount", 0.0, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "dirtScale", "Dirt Scale", 1.0, 0.25, 8.0, p++, page);
-
-    defineDoubleParam(paramSet, "edgeGuard", "Edge Halo Guard", 0.80, 0.0, 1.0, p++, page);
-    defineDoubleParam(paramSet, "outputMix", "Output Mix", 0.65, 0.0, 1.0, p++, page);
+        page,
+        true);
+    defineIntegerParam(
+        paramSet, "apertureIndex", "Legacy Aperture Index", 0, 0, 157,
+        p++, page, nullptr, nullptr, true);
+    defineIntegerParam(
+        paramSet, "dirtIndex", "Legacy Dirt Index", 0, 0, 8,
+        p++, page, nullptr, nullptr, true);
     return kOfxStatOK;
 }
 
@@ -599,9 +884,16 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(props, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.1");
+    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.2");
     gPropHost->propSetString(props, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
+#if defined(__APPLE__)
+    gPropHost->propSetString(
+        props,
+        kOfxImageEffectPropMetalRenderSupported,
+        0,
+        "true");
+#endif
     return kOfxStatOK;
 }
 
