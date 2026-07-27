@@ -22,6 +22,7 @@ jobs:
           make -C Buckswood_Lens_Physics metaltest
           make -C Buckswood_AI_Photorealizer metaltest
           make -C Buckswood_DeJitter smoketest
+          make -C Buckswood_Optics_Lab smoketest
 
       - name: Validate OpenCL kernels
         run: |
@@ -34,6 +35,7 @@ jobs:
           make -C Buckswood_Lens_Physics bundle
           make -C Buckswood_AI_Photorealizer bundle
           make -C Buckswood_DeJitter descriptor-test
+          make -C Buckswood_Optics_Lab descriptor-test
 
       - name: Build Premiere adapter smoke test
         run: bash premiere_port/scripts/build_adapter_smoketest.sh
