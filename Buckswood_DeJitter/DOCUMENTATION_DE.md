@@ -1,4 +1,4 @@
-# Buckswood DeJitter v1.1
+# Buckswood DeJitter v1.2
 
 ## Zweck
 
@@ -9,13 +9,18 @@ ausgewählte, starre Bildstelle in den vorherigen und nächsten Frames.
 ## Schnellstart
 
 1. Effekt auf einen Clip oder Color-Node legen.
-2. `View` auf `Tracking Region` stellen.
-3. `Track Point` auf ein kontrastreiches, unbewegliches Detail setzen.
-4. Den Punkt mit `Track Point Fine X/Y` pixelgenau verschieben. Optional
+2. `Show Viewer Tracking Area` aktivieren.
+3. Das Fadenkreuz oder die Innenfläche des Rahmens auf ein kontrastreiches,
+   unbewegliches Detail ziehen.
+4. Seitliche Griffe ändern eine Dimension, Eckgriffe Breite und Höhe gemeinsam.
+5. Den Punkt mit `Track Point Fine X/Y` pixelgenau verschieben. Optional
    `Snap Point to Texture` aktivieren.
-5. `Tracking Region Width/Height` passend um dieses Detail einstellen.
 6. `View` auf `Motion Vector` stellen und das Tracking prüfen.
 7. Zu `Stabilized Result` wechseln und `DeJitter Strength` dosieren.
+
+Der Viewer-Rahmen bestimmt nur die Analysefläche für die Bewegungsschätzung.
+Er ist keine lokale Effektmaske: Die Stabilisierung wirkt auf das gesamte Bild.
+Für eine lokale Wirkung eine Node-Maske in Resolve verwenden.
 
 ## Parameter
 
@@ -26,6 +31,8 @@ ausgewählte, starre Bildstelle in den vorherigen und nächsten Frames.
   angezeigt.
 - `Texture Snap Radius`: maximaler Suchabstand für das Einrasten.
 - `Tracking Region Width/Height`: Größe der Tracking-Maske relativ zum Bild.
+- `Show Viewer Tracking Area`: zeigt den interaktiven Mittelpunkt und die
+  Größen-Griffe direkt im Resolve-Viewer.
 - `Maximum Jitter`: Suchradius in Pixeln.
 - `Temporal Analysis`: Ein Frame-Paar ist schneller; zwei Paare sind ruhiger.
 - `Tracking Quality`: Genauigkeit und Rechenaufwand des Trackings.
@@ -39,12 +46,15 @@ ausgewählte, starre Bildstelle in den vorherigen und nächsten Frames.
 - `Frame Edge Handling`: Auto Zoom, Spiegelung oder Randpixel-Verlängerung.
 - `Output Mix`: Mischung zwischen Original und stabilisiertem Bild.
 
-## Performance in v1.1
+## Viewer-Steuerung und Performance in v1.2
 
 Die normalisierte Korrelation liest jeden Kandidaten-Patch nur noch einmal.
 Unveränderte oder unsicher getrackte Frames umgehen außerdem das hochwertige
 Resampling vollständig. Beide Optimierungen ändern weder die gewählte
 Tracking-Qualität noch die finale Interpolation.
+
+Das v1.2-Overlay nutzt die hostunabhängige OpenFX Draw Suite. Es zeichnet nur
+Bedienelemente im Viewer und erscheint nicht im gerenderten Bild.
 
 ## Diagnoseansichten
 

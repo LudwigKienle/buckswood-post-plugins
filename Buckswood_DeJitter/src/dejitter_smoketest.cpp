@@ -1,4 +1,5 @@
 #include "DeJitterCore.h"
+#include "DeJitterOverlay.h"
 
 #include <algorithm>
 #include <cmath>
@@ -104,6 +105,64 @@ float luma(Pixel pixel)
 
 int main()
 {
+    const buckswood_dejitter::OverlayBounds overlayBounds{
+        0.0,
+        0.0,
+        1920.0,
+        1080.0,
+    };
+    const buckswood_dejitter::OverlayParameters overlayParameters{
+        {960.0, 540.0},
+        0.20,
+        0.30,
+    };
+    const auto overlayRect =
+        buckswood_dejitter::DeJitterOverlay::rect(
+            overlayBounds,
+            overlayParameters);
+    require(
+        std::fabs(overlayRect.left - 768.0) < 0.001 &&
+            std::fabs(overlayRect.top - 702.0) < 0.001,
+        "overlay rectangle matches normalized tracking area");
+    require(
+        buckswood_dejitter::DeJitterOverlay::hitTest(
+            overlayRect,
+            overlayParameters.center,
+            {overlayRect.right, overlayRect.top},
+            {1.0, 1.0}) ==
+            buckswood_dejitter::OverlayDragTopRight,
+        "overlay corner handle hit testing");
+    require(
+        buckswood_dejitter::DeJitterOverlay::hitTest(
+            overlayRect,
+            overlayParameters.center,
+            {900.0, 520.0},
+            {1.0, 1.0}) ==
+            buckswood_dejitter::OverlayDragMove,
+        "overlay interior moves tracking area");
+    const auto movedOverlay =
+        buckswood_dejitter::DeJitterOverlay::drag(
+            buckswood_dejitter::OverlayDragMove,
+            overlayBounds,
+            overlayParameters,
+            {1200.0, 700.0},
+            {60.0, 20.0});
+    require(
+        std::fabs(movedOverlay.center.x - 1260.0) < 0.001 &&
+            std::fabs(movedOverlay.center.y - 720.0) < 0.001,
+        "overlay move preserves grab offset");
+    const auto resizedOverlay =
+        buckswood_dejitter::DeJitterOverlay::drag(
+            buckswood_dejitter::OverlayDragTopRight,
+            overlayBounds,
+            overlayParameters,
+            {1344.0, 810.0},
+            {});
+    require(
+        std::fabs(resizedOverlay.regionWidth - 0.40) < 0.001 &&
+            std::fabs(resizedOverlay.regionHeight - 0.50) < 0.001,
+        "overlay corner resizes width and height");
+
     auto controls =
         buckswood_dejitter::DeJitterCore::defaultControls();
     controls.trackX = kFeatureX;

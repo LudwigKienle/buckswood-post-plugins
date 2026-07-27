@@ -51,6 +51,9 @@ int main(int argc, char** argv)
     require(
         plugin->pluginVersionMajor == 1,
         "plugin exposes v1 major version");
+    require(
+        plugin->pluginVersionMinor == 2,
+        "plugin exposes v1.2 minor version");
     require(plugin->mainEntry != nullptr, "plugin main entry exists");
     require(
         getPlugin(1) == nullptr,

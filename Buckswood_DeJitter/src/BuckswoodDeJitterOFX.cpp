@@ -1,7 +1,10 @@
 #include "DeJitterCore.h"
+#include "DeJitterOverlay.h"
 #include "OfxRenderRuntime.h"
 
+#include "ofxDrawSuite.h"
 #include "ofxImageEffect.h"
+#include "ofxInteract.h"
 #include "ofxParam.h"
 #include "ofxPixels.h"
 
@@ -31,6 +34,12 @@ using buckswood_dejitter::Bounds;
 using buckswood_dejitter::Controls;
 using buckswood_dejitter::DeJitterCore;
 using buckswood_dejitter::FrameInfo;
+using buckswood_dejitter::DeJitterOverlay;
+using buckswood_dejitter::OverlayBounds;
+using buckswood_dejitter::OverlayDragMode;
+using buckswood_dejitter::OverlayParameters;
+using buckswood_dejitter::OverlayPoint;
+using buckswood_dejitter::OverlayRect;
 using buckswood_dejitter::Pixel;
 using buckswood_dejitter::Sampler;
 using buckswood_dejitter::TemporalContext;
@@ -41,12 +50,14 @@ OfxImageEffectSuiteV1* gEffectHost = nullptr;
 OfxPropertySuiteV1* gPropHost = nullptr;
 OfxParameterSuiteV1* gParamHost = nullptr;
 OfxMultiThreadSuiteV1* gThreadHost = nullptr;
+OfxInteractSuiteV1* gInteractHost = nullptr;
+OfxDrawSuiteV1* gDrawHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.dejitter";
 constexpr const char* kSourceFrameRangeProp =
     "OfxImageClipPropFrameRange_Source";
 constexpr int kPluginMajorVersion = 1;
-constexpr int kPluginMinorVersion = 1;
+constexpr int kPluginMinorVersion = 2;
 constexpr float kPi = 3.14159265358979323846f;
 
 struct ImageInfo {
@@ -1133,6 +1144,563 @@ OfxStatus render(
     return kOfxStatErrUnsupported;
 }
 
+struct OverlayInteractData {
+    OfxParamSetHandle paramSet = nullptr;
+    OfxImageClipHandle sourceClip = nullptr;
+    OfxParamHandle trackPoint = nullptr;
+    OfxParamHandle trackNudgeX = nullptr;
+    OfxParamHandle trackNudgeY = nullptr;
+    OfxParamHandle regionWidth = nullptr;
+    OfxParamHandle regionHeight = nullptr;
+    OfxParamHandle showViewerControls = nullptr;
+    OverlayDragMode dragMode =
+        buckswood_dejitter::OverlayDragNone;
+    OverlayParameters dragStart;
+    OverlayBounds dragBounds;
+    OverlayPoint grabOffset;
+    bool editOpen = false;
+};
+
+OverlayInteractData* overlayData(
+    OfxInteractHandle interact)
+{
+    if (!gInteractHost || !gPropHost) {
+        return nullptr;
+    }
+    OfxPropertySetHandle properties = nullptr;
+    void* data = nullptr;
+    if (
+        gInteractHost->interactGetPropertySet(
+            interact,
+            &properties) != kOfxStatOK ||
+        gPropHost->propGetPointer(
+            properties,
+            kOfxPropInstanceData,
+            0,
+            &data) != kOfxStatOK) {
+        return nullptr;
+    }
+    return static_cast<OverlayInteractData*>(data);
+}
+
+OfxTime overlayTime(OfxPropertySetHandle inArgs)
+{
+    double time = 0.0;
+    if (inArgs) {
+        gPropHost->propGetDouble(
+            inArgs,
+            kOfxPropTime,
+            0,
+            &time);
+    }
+    return time;
+}
+
+OverlayPoint overlayPen(OfxPropertySetHandle inArgs)
+{
+    OverlayPoint point;
+    if (inArgs) {
+        gPropHost->propGetDoubleN(
+            inArgs,
+            kOfxInteractPropPenPosition,
+            2,
+            &point.x);
+    }
+    return point;
+}
+
+OverlayPoint overlayPixelScale(OfxPropertySetHandle inArgs)
+{
+    OverlayPoint scale{1.0, 1.0};
+    if (inArgs) {
+        gPropHost->propGetDoubleN(
+            inArgs,
+            kOfxInteractPropPixelScale,
+            2,
+            &scale.x);
+    }
+    scale.x = std::max(1.0e-6, std::fabs(scale.x));
+    scale.y = std::max(1.0e-6, std::fabs(scale.y));
+    return scale;
+}
+
+bool viewerControlsVisible(
+    const OverlayInteractData& data,
+    OfxTime time)
+{
+    if (!data.showViewerControls) {
+        return true;
+    }
+    int visible = 1;
+    if (
+        gParamHost->paramGetValueAtTime(
+            data.showViewerControls,
+            time,
+            &visible) != kOfxStatOK) {
+        return true;
+    }
+    return visible != 0;
+}
+
+OverlayParameters overlayParameters(
+    const OverlayInteractData& data,
+    OfxTime time)
+{
+    OverlayParameters parameters;
+    if (data.trackPoint) {
+        gParamHost->paramGetValueAtTime(
+            data.trackPoint,
+            time,
+            &parameters.center.x,
+            &parameters.center.y);
+    }
+    if (data.regionWidth) {
+        gParamHost->paramGetValueAtTime(
+            data.regionWidth,
+            time,
+            &parameters.regionWidth);
+    }
+    if (data.regionHeight) {
+        gParamHost->paramGetValueAtTime(
+            data.regionHeight,
+            time,
+            &parameters.regionHeight);
+    }
+    return parameters;
+}
+
+OverlayBounds overlayBounds(
+    const OverlayInteractData& data,
+    OfxTime time,
+    OverlayPoint fallbackCenter)
+{
+    OfxRectD rod{
+        fallbackCenter.x - 960.0,
+        fallbackCenter.y - 540.0,
+        fallbackCenter.x + 960.0,
+        fallbackCenter.y + 540.0,
+    };
+    if (data.sourceClip) {
+        gEffectHost->clipGetRegionOfDefinition(
+            data.sourceClip,
+            time,
+            &rod);
+    }
+    if (
+        rod.x2 <= rod.x1 + 1.0e-6 ||
+        rod.y2 <= rod.y1 + 1.0e-6) {
+        rod = OfxRectD{0.0, 0.0, 1920.0, 1080.0};
+    }
+    return OverlayBounds{rod.x1, rod.y1, rod.x2, rod.y2};
+}
+
+void drawOverlayHandle(
+    OfxDrawContextHandle context,
+    OverlayPoint position,
+    OverlayPoint pixelScale)
+{
+    const double halfWidth = pixelScale.x * 4.5;
+    const double halfHeight = pixelScale.y * 4.5;
+    const OfxPointD points[2] = {
+        {position.x - halfWidth, position.y - halfHeight},
+        {position.x + halfWidth, position.y + halfHeight},
+    };
+    gDrawHost->draw(
+        context,
+        kOfxDrawPrimitiveRectangle,
+        points,
+        2);
+}
+
+OfxStatus drawOverlay(
+    OfxInteractHandle interact,
+    OfxPropertySetHandle inArgs)
+{
+    OverlayInteractData* data = overlayData(interact);
+    if (
+        !data ||
+        !gDrawHost ||
+        !viewerControlsVisible(*data, overlayTime(inArgs))) {
+        return kOfxStatReplyDefault;
+    }
+
+    void* contextPointer = nullptr;
+    if (
+        gPropHost->propGetPointer(
+            inArgs,
+            kOfxInteractPropDrawContext,
+            0,
+            &contextPointer) != kOfxStatOK ||
+        !contextPointer) {
+        return kOfxStatReplyDefault;
+    }
+    auto context =
+        static_cast<OfxDrawContextHandle>(contextPointer);
+    const OfxTime time = overlayTime(inArgs);
+    const OverlayParameters parameters =
+        overlayParameters(*data, time);
+    const OverlayBounds bounds =
+        overlayBounds(*data, time, parameters.center);
+    const OverlayRect area =
+        DeJitterOverlay::rect(bounds, parameters);
+    const OverlayPoint pixelScale =
+        overlayPixelScale(inArgs);
+
+    const OfxPointD outline[4] = {
+        {area.left, area.bottom},
+        {area.right, area.bottom},
+        {area.right, area.top},
+        {area.left, area.top},
+    };
+    OfxRGBAColourF shadow{0.02f, 0.02f, 0.02f, 0.82f};
+    gDrawHost->setColour(context, &shadow);
+    gDrawHost->setLineWidth(context, 4.0f);
+    gDrawHost->draw(
+        context,
+        kOfxDrawPrimitiveLineLoop,
+        outline,
+        4);
+
+    OfxRGBAColourF color{0.18f, 0.92f, 0.34f, 1.0f};
+    const OfxStandardColour standardColor =
+        data->dragMode == buckswood_dejitter::OverlayDragNone
+        ? kOfxStandardColourOverlaySelected
+        : kOfxStandardColourOverlayActive;
+    gDrawHost->getColour(
+        context,
+        standardColor,
+        &color);
+    gDrawHost->setColour(context, &color);
+    gDrawHost->setLineWidth(context, 1.7f);
+    gDrawHost->draw(
+        context,
+        kOfxDrawPrimitiveLineLoop,
+        outline,
+        4);
+
+    const double crossX = pixelScale.x * 12.0;
+    const double crossY = pixelScale.y * 12.0;
+    const OfxPointD cross[4] = {
+        {parameters.center.x - crossX, parameters.center.y},
+        {parameters.center.x + crossX, parameters.center.y},
+        {parameters.center.x, parameters.center.y - crossY},
+        {parameters.center.x, parameters.center.y + crossY},
+    };
+    gDrawHost->draw(
+        context,
+        kOfxDrawPrimitiveLines,
+        cross,
+        4);
+
+    const double middleX = (area.left + area.right) * 0.5;
+    const double middleY = (area.bottom + area.top) * 0.5;
+    const OverlayPoint handles[8] = {
+        {area.left, area.bottom},
+        {area.right, area.bottom},
+        {area.left, area.top},
+        {area.right, area.top},
+        {area.left, middleY},
+        {area.right, middleY},
+        {middleX, area.bottom},
+        {middleX, area.top},
+    };
+    for (const OverlayPoint handle : handles) {
+        drawOverlayHandle(context, handle, pixelScale);
+    }
+
+    const OfxPointD labelPosition{
+        area.left + pixelScale.x * 7.0,
+        area.top + pixelScale.y * 8.0,
+    };
+    gDrawHost->drawText(
+        context,
+        "TRACKING AREA (ANALYSIS)",
+        &labelPosition,
+        kOfxDrawTextAlignmentLeft |
+            kOfxDrawTextAlignmentBaseline);
+    return kOfxStatOK;
+}
+
+OfxStatus createOverlayInstance(
+    OfxImageEffectHandle effect,
+    OfxInteractHandle interact)
+{
+    auto data = std::make_unique<OverlayInteractData>();
+    if (
+        !effect ||
+        gEffectHost->getParamSet(
+            effect,
+            &data->paramSet) != kOfxStatOK) {
+        return kOfxStatFailed;
+    }
+
+    auto getParam = [&](const char* name, OfxParamHandle& handle) {
+        gParamHost->paramGetHandle(
+            data->paramSet,
+            name,
+            &handle,
+            nullptr);
+    };
+    getParam("trackPoint", data->trackPoint);
+    getParam("trackNudgeX", data->trackNudgeX);
+    getParam("trackNudgeY", data->trackNudgeY);
+    getParam("regionWidth", data->regionWidth);
+    getParam("regionHeight", data->regionHeight);
+    getParam("showViewerControls", data->showViewerControls);
+    if (
+        !data->trackPoint ||
+        !data->regionWidth ||
+        !data->regionHeight) {
+        return kOfxStatFailed;
+    }
+    gEffectHost->clipGetHandle(
+        effect,
+        kOfxImageEffectSimpleSourceClipName,
+        &data->sourceClip,
+        nullptr);
+
+    OfxPropertySetHandle properties = nullptr;
+    if (
+        gInteractHost->interactGetPropertySet(
+            interact,
+            &properties) != kOfxStatOK) {
+        return kOfxStatFailed;
+    }
+    gPropHost->propSetPointer(
+        properties,
+        kOfxPropInstanceData,
+        0,
+        data.get());
+    const char* slaves[] = {
+        "trackPoint",
+        "regionWidth",
+        "regionHeight",
+        "showViewerControls",
+    };
+    for (int index = 0; index < 4; ++index) {
+        gPropHost->propSetString(
+            properties,
+            kOfxInteractPropSlaveToParam,
+            index,
+            slaves[index]);
+    }
+    data.release();
+    return kOfxStatOK;
+}
+
+OfxStatus destroyOverlayInstance(OfxInteractHandle interact)
+{
+    OverlayInteractData* data = overlayData(interact);
+    if (data && data->editOpen && data->paramSet) {
+        gParamHost->paramEditEnd(data->paramSet);
+    }
+    delete data;
+    OfxPropertySetHandle properties = nullptr;
+    if (
+        gInteractHost &&
+        gInteractHost->interactGetPropertySet(
+            interact,
+            &properties) == kOfxStatOK) {
+        gPropHost->propSetPointer(
+            properties,
+            kOfxPropInstanceData,
+            0,
+            nullptr);
+    }
+    return kOfxStatOK;
+}
+
+OfxStatus overlayPenDown(
+    OfxInteractHandle interact,
+    OfxPropertySetHandle inArgs)
+{
+    OverlayInteractData* data = overlayData(interact);
+    const OfxTime time = overlayTime(inArgs);
+    if (
+        !data ||
+        !viewerControlsVisible(*data, time)) {
+        return kOfxStatReplyDefault;
+    }
+    const OverlayPoint pen = overlayPen(inArgs);
+    data->dragStart = overlayParameters(*data, time);
+    data->dragBounds =
+        overlayBounds(*data, time, data->dragStart.center);
+    const OverlayRect area =
+        DeJitterOverlay::rect(
+            data->dragBounds,
+            data->dragStart);
+    data->dragMode = DeJitterOverlay::hitTest(
+        area,
+        data->dragStart.center,
+        pen,
+        overlayPixelScale(inArgs));
+    if (
+        data->dragMode ==
+        buckswood_dejitter::OverlayDragNone) {
+        return kOfxStatReplyDefault;
+    }
+
+    data->grabOffset = OverlayPoint{
+        data->dragStart.center.x - pen.x,
+        data->dragStart.center.y - pen.y,
+    };
+    if (data->paramSet) {
+        data->editOpen =
+            gParamHost->paramEditBegin(
+                data->paramSet,
+                "Edit DeJitter Tracking Area") == kOfxStatOK;
+    }
+    if (
+        data->dragMode ==
+        buckswood_dejitter::OverlayDragMove) {
+        if (data->trackNudgeX) {
+            gParamHost->paramSetValue(
+                data->trackNudgeX,
+                0.0);
+        }
+        if (data->trackNudgeY) {
+            gParamHost->paramSetValue(
+                data->trackNudgeY,
+                0.0);
+        }
+    }
+    return kOfxStatOK;
+}
+
+OfxStatus overlayPenMotion(
+    OfxInteractHandle interact,
+    OfxPropertySetHandle inArgs)
+{
+    OverlayInteractData* data = overlayData(interact);
+    if (
+        !data ||
+        data->dragMode ==
+            buckswood_dejitter::OverlayDragNone) {
+        return kOfxStatReplyDefault;
+    }
+    const OverlayParameters parameters =
+        DeJitterOverlay::drag(
+            data->dragMode,
+            data->dragBounds,
+            data->dragStart,
+            overlayPen(inArgs),
+            data->grabOffset);
+    if (
+        data->dragMode ==
+        buckswood_dejitter::OverlayDragMove) {
+        gParamHost->paramSetValue(
+            data->trackPoint,
+            parameters.center.x,
+            parameters.center.y);
+    } else {
+        if (
+            parameters.regionWidth !=
+            data->dragStart.regionWidth) {
+            gParamHost->paramSetValue(
+                data->regionWidth,
+                parameters.regionWidth);
+        }
+        if (
+            parameters.regionHeight !=
+            data->dragStart.regionHeight) {
+            gParamHost->paramSetValue(
+                data->regionHeight,
+                parameters.regionHeight);
+        }
+    }
+    if (gInteractHost) {
+        gInteractHost->interactRedraw(interact);
+    }
+    return kOfxStatOK;
+}
+
+OfxStatus overlayPenUp(OfxInteractHandle interact)
+{
+    OverlayInteractData* data = overlayData(interact);
+    if (
+        !data ||
+        data->dragMode ==
+            buckswood_dejitter::OverlayDragNone) {
+        return kOfxStatReplyDefault;
+    }
+    data->dragMode =
+        buckswood_dejitter::OverlayDragNone;
+    if (data->editOpen && data->paramSet) {
+        gParamHost->paramEditEnd(data->paramSet);
+        data->editOpen = false;
+    }
+    if (gInteractHost) {
+        gInteractHost->interactRedraw(interact);
+    }
+    return kOfxStatOK;
+}
+
+OfxStatus overlayMain(
+    const char* action,
+    const void* handle,
+    OfxPropertySetHandle inArgs,
+    OfxPropertySetHandle)
+{
+    auto interact = reinterpret_cast<OfxInteractHandle>(
+        const_cast<void*>(handle));
+    if (std::strcmp(action, kOfxActionDescribe) == 0) {
+        return kOfxStatOK;
+    }
+    if (!gInteractHost || !gPropHost) {
+        return kOfxStatReplyDefault;
+    }
+
+    OfxPropertySetHandle properties = nullptr;
+    OfxImageEffectHandle effect = nullptr;
+    if (
+        gInteractHost->interactGetPropertySet(
+            interact,
+            &properties) == kOfxStatOK) {
+        gPropHost->propGetPointer(
+            properties,
+            kOfxPropEffectInstance,
+            0,
+            reinterpret_cast<void**>(&effect));
+    }
+    if (
+        std::strcmp(
+            action,
+            kOfxActionCreateInstance) == 0) {
+        return createOverlayInstance(effect, interact);
+    }
+    if (
+        std::strcmp(
+            action,
+            kOfxActionDestroyInstance) == 0) {
+        return destroyOverlayInstance(interact);
+    }
+    if (
+        std::strcmp(
+            action,
+            kOfxInteractActionDraw) == 0) {
+        return drawOverlay(interact, inArgs);
+    }
+    if (
+        std::strcmp(
+            action,
+            kOfxInteractActionPenDown) == 0) {
+        return overlayPenDown(interact, inArgs);
+    }
+    if (
+        std::strcmp(
+            action,
+            kOfxInteractActionPenMotion) == 0) {
+        return overlayPenMotion(interact, inArgs);
+    }
+    if (
+        std::strcmp(
+            action,
+            kOfxInteractActionPenUp) == 0) {
+        return overlayPenUp(interact);
+    }
+    return kOfxStatReplyDefault;
+}
+
 void addParamToPage(
     OfxPropertySetHandle page,
     int index,
@@ -1171,6 +1739,19 @@ void defineDoubleParam(
         kOfxPropLabel,
         0,
         label);
+    if (std::strcmp(name, "regionWidth") == 0) {
+        gPropHost->propSetString(
+            properties,
+            kOfxParamPropHint,
+            0,
+            "Drag the left or right viewer handle to resize the tracking area.");
+    } else if (std::strcmp(name, "regionHeight") == 0) {
+        gPropHost->propSetString(
+            properties,
+            kOfxParamPropHint,
+            0,
+            "Drag the top or bottom viewer handle to resize the tracking area.");
+    }
     gPropHost->propSetString(
         properties,
         kOfxParamPropDoubleType,
@@ -1354,6 +1935,11 @@ void definePointParam(
         kOfxPropLabel,
         0,
         label);
+    gPropHost->propSetString(
+        properties,
+        kOfxParamPropHint,
+        0,
+        "Drag the center or interior of the tracking box directly in the viewer.");
     gPropHost->propSetString(
         properties,
         kOfxParamPropDoubleType,
@@ -1639,6 +2225,13 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
         1,
         22,
         page);
+    defineBooleanParam(
+        paramSet,
+        "showViewerControls",
+        "Show Viewer Tracking Area",
+        1,
+        23,
+        page);
     return kOfxStatOK;
 }
 
@@ -1675,7 +2268,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
         properties,
         kOfxPropLabel,
         0,
-        "Buckswood DeJitter v1.1");
+        "Buckswood DeJitter v1.2");
     gPropHost->propSetString(
         properties,
         kOfxImageEffectPluginPropGrouping,
@@ -1686,6 +2279,22 @@ OfxStatus describe(OfxImageEffectHandle effect)
         kOfxImageEffectPropSupportedContexts,
         0,
         kOfxImageEffectContextFilter);
+    int supportsOverlays = 0;
+    if (
+        gInteractHost &&
+        gDrawHost &&
+        gPropHost->propGetInt(
+            gHost->host,
+            kOfxImageEffectPropSupportsOverlays,
+            0,
+            &supportsOverlays) == kOfxStatOK &&
+        supportsOverlays != 0) {
+        gPropHost->propSetPointer(
+            properties,
+            kOfxImageEffectPluginPropOverlayInteractV2,
+            0,
+            reinterpret_cast<void*>(overlayMain));
+    }
     return kOfxStatOK;
 }
 
@@ -1725,6 +2334,22 @@ OfxStatus onLoad()
                 gHost->fetchSuite(
                     gHost->host,
                     kOfxMultiThreadSuite,
+                    1)));
+    gInteractHost =
+        const_cast<OfxInteractSuiteV1*>(
+            reinterpret_cast<
+                const OfxInteractSuiteV1*>(
+                gHost->fetchSuite(
+                    gHost->host,
+                    kOfxInteractSuite,
+                    1)));
+    gDrawHost =
+        const_cast<OfxDrawSuiteV1*>(
+            reinterpret_cast<
+                const OfxDrawSuiteV1*>(
+                gHost->fetchSuite(
+                    gHost->host,
+                    kOfxDrawSuite,
                     1)));
     return gEffectHost && gPropHost && gParamHost
         ? kOfxStatOK
