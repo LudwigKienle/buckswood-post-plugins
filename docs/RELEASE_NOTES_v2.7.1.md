@@ -1,4 +1,4 @@
-# Buckswood Post Plugins v2.6.1
+# Buckswood Post Plugins v2.7.1
 
 This focused update makes Buckswood DeJitter easier to place and tune directly
 inside the DaVinci Resolve viewer.

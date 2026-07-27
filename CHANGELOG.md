@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.6.1 - 2026-07-27
+## v2.7.1 - 2026-07-27
 
 - Updated Buckswood DeJitter to v1.2 with a native OpenFX Draw Suite overlay.
 - Added a draggable tracking center and eight viewer resize handles.
