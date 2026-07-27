@@ -76,7 +76,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         !removeIfExists(ofxRoot / L"BuckswoodAIPhotorealizer.ofx.bundle", error) ||
         !removeIfExists(ofxRoot / L"BuckswoodFilmEmulation.ofx.bundle", error) ||
         !removeIfExists(ofxRoot / L"BuckswoodCinematicTools.ofx.bundle", error) ||
-        !removeIfExists(ofxRoot / L"BuckswoodLookDNA.ofx.bundle", error)) {
+        !removeIfExists(ofxRoot / L"BuckswoodLookDNA.ofx.bundle", error) ||
+        !removeIfExists(ofxRoot / L"BuckswoodDeJitter.ofx.bundle", error)) {
         showMessage(L"Buckswood Resolve Plugins", error, MB_ICONERROR);
         return 1;
     }
@@ -101,6 +102,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         {ofxRoot, L"BuckswoodCinematicTools.ofx.bundle\\Contents\\Win64\\BuckswoodCinematicTools.ofx", payload::cinematic_ofx, payload::cinematic_ofx_size},
         {ofxRoot, L"BuckswoodLookDNA.ofx.bundle\\Contents\\Info.plist", payload::look_info_plist, payload::look_info_plist_size},
         {ofxRoot, L"BuckswoodLookDNA.ofx.bundle\\Contents\\Win64\\BuckswoodLookDNA.ofx", payload::look_ofx, payload::look_ofx_size},
+        {ofxRoot, L"BuckswoodDeJitter.ofx.bundle\\Contents\\Info.plist", payload::dejitter_info_plist, payload::dejitter_info_plist_size},
+        {ofxRoot, L"BuckswoodDeJitter.ofx.bundle\\Contents\\Win64\\BuckswoodDeJitter.ofx", payload::dejitter_ofx, payload::dejitter_ofx_size},
         {lutRoot, L"Buckswood_Lens_Physics_v01.dctl", payload::lens_dctl, payload::lens_dctl_size},
         {lutRoot, L"Buckswood_AI_Photorealizer_v01.dctl", payload::photo_dctl, payload::photo_dctl_size},
     };
@@ -125,7 +128,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         L"Color Page > OpenFX > Buckswood Diagnostic\n"
         L"Color Page > OpenFX > Buckswood\n"
         L"Color Page > OpenFX > Buckswood AI\n\n"
-        L"New: Film Emulation, Cinematic Tools and Look DNA reference matching\n\n"
+        L"New: DeJitter temporal micro-shake removal\n"
+        L"Plus Film Emulation, Cinematic Tools and Look DNA reference matching\n\n"
         L"DCTL fallbacks are installed in the Resolve LUT folder.",
         MB_ICONINFORMATION);
     return 0;

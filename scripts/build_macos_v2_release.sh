@@ -32,6 +32,7 @@ declare -a SRC_PKGS=(
     "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer.pkg|Buckswood_Film_Emulation_v2_Installer.pkg"
     "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_Installer.pkg|Buckswood_Cinematic_Tools_v2_Installer.pkg"
     "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer.pkg|Buckswood_Look_DNA_v2_Installer.pkg"
+    "Buckswood_DeJitter/release/Buckswood_DeJitter_v1_Installer.pkg|Buckswood_DeJitter_v1_Installer.pkg"
 )
 
 rm -rf "$V2_DIR"
@@ -78,6 +79,12 @@ Release for DaVinci Resolve / OpenFX on macOS and Windows.
   - overlapping 3x3 spatial map and five-frame cut-aware analysis
   - skin, highlight, scene-identity, temporal, and gamut protection
   - direct image loading plus portable BWLOOK profiles
+
+- `Buckswood_DeJitter_v1_Installer.pkg`
+  - user-selected tracking point and region
+  - symmetric previous/next-frame micro-jitter analysis
+  - motion-vector, confidence, region, and difference diagnostics
+  - cut-aware confidence fallback and high-quality resampling
 
 ## Included Windows Files
 
@@ -135,7 +142,8 @@ for f in \
     "Buckswood_Lens_Physics/release/Buckswood_Lens_Physics_Installer_SHA256SUMS.txt" \
     "Buckswood_Film_Emulation/release/Buckswood_Film_Emulation_v2_Installer_SHA256SUMS.txt" \
     "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_SHA256SUMS.txt" \
-    "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer_SHA256SUMS.txt"; do
+    "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer_SHA256SUMS.txt" \
+    "Buckswood_DeJitter/release/Buckswood_DeJitter_v1_SHA256SUMS.txt"; do
     [[ -f "$ROOT_DIR/$f" ]] && cp "$ROOT_DIR/$f" "$V2_DIR/Checksums/"
 done
 
@@ -159,6 +167,8 @@ declare -a HOST_RELEASE_ASSETS=(
     "Buckswood_Cinematic_Tools/release/Buckswood_Cinematic_Tools_v2_Installer.pkg"
     "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer.dmg"
     "Buckswood_Look_DNA/release/Buckswood_Look_DNA_v2_Installer.pkg"
+    "Buckswood_DeJitter/release/Buckswood_DeJitter_v1_Installer.dmg"
+    "Buckswood_DeJitter/release/Buckswood_DeJitter_v1_Installer.pkg"
     "nuke_release/Buckswood_Nuke_OFX_v2.zip"
     "premiere_port/release/Buckswood_Premiere_Native_macOS.zip"
     "premiere_port/release/Buckswood_Premiere_Native_Windows.zip"
@@ -228,6 +238,8 @@ fi
             Buckswood_Cinematic_Tools_v2_Installer.pkg \
             Buckswood_Look_DNA_v2_Installer.dmg \
             Buckswood_Look_DNA_v2_Installer.pkg \
+            Buckswood_DeJitter_v1_Installer.dmg \
+            Buckswood_DeJitter_v1_Installer.pkg \
             Buckswood_Nuke_OFX_v2.zip \
             Buckswood_Premiere_Native_macOS.zip \
             Buckswood_Premiere_Native_Windows.zip \

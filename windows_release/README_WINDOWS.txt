@@ -26,6 +26,7 @@ Color Page > OpenFX > Buckswood > Buckswood Frame Director
 Color Page > OpenFX > Buckswood > Buckswood Radiance Recover
 Color Page > OpenFX > Buckswood > Buckswood Temporal Integrity
 Color Page > OpenFX > Buckswood > Buckswood Look DNA v2.2
+Color Page > OpenFX > Buckswood > Buckswood DeJitter v1.0
 Color Page > DCTL > Buckswood_Lens_Physics_v01
 Color Page > DCTL > Buckswood_AI_Photorealizer_v01
 
@@ -39,6 +40,14 @@ Buckswood Frame Director v2.1
 Buckswood Radiance Recover v2.1
 Buckswood Temporal Integrity v2.1
 Buckswood Look DNA v2.2
+Buckswood DeJitter v1.0
+
+DeJitter note:
+
+Use View > Tracking Region first. Place Track Point on a fixed, high-contrast
+detail, size the region around it, then return to Stabilized Result. The effect
+uses real previous/next-frame OpenFX access and safely falls back to the
+unchanged frame when tracking confidence is low.
 
 Optional ML companion:
 

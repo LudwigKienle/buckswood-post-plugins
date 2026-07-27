@@ -21,6 +21,7 @@ Included tools:
 - Buckswood Radiance Recover v2.1
 - Buckswood Temporal Integrity v2.1
 - Buckswood Look DNA v2.2
+- Buckswood DeJitter v1.0
 
 Additional standalone macOS assets:
 
@@ -30,6 +31,8 @@ Additional standalone macOS assets:
 - `Buckswood_Film_Emulation_v2_Installer.dmg`
 - `Buckswood_Look_DNA_v2_Installer.pkg`
 - `Buckswood_Look_DNA_v2_Installer.dmg`
+- `Buckswood_DeJitter_v1_Installer.pkg`
+- `Buckswood_DeJitter_v1_Installer.dmg`
 
 The Cinematic Tools suite and Film Emulation are included in the unified Windows setup and manual ZIP.
 
@@ -50,8 +53,12 @@ Included tools:
 - Buckswood AI Photorealizer v0.3
 - Buckswood Film Emulation v2.1
 - Buckswood Look DNA v2.2
+- Buckswood DeJitter v1.0
 
 Temporal modes in Fake Diagnostic depend on host frame access. If temporal access is limited in Nuke, use the spatial diagnostic modes first.
+
+DeJitter also requires temporal frame access. Its confidence guard returns the
+unchanged source when the selected region cannot be tracked safely.
 
 Look DNA can load direct reference images on macOS and Windows. Its portable
 `.bwlook` profiles are recommended for repeatable Nuke jobs.
@@ -85,3 +92,6 @@ three portable `.bwlook` profile slots plus three built-in reference profiles
 because the native PiPL control surface has no file-path picker.
 
 Premiere builds require the Adobe Premiere Pro C++ SDK. Do not commit the SDK to GitHub.
+
+DeJitter is currently Resolve/Nuke OFX only because the Premiere PiPL adapter
+does not expose the neighboring frames required by its symmetric tracker.

@@ -2,7 +2,7 @@
 
 Free cinematic post-production tools for DaVinci Resolve, with native Premiere Pro and experimental Nuke packages.
 
-This repository contains the source for eight Buckswood Resolve tools:
+This repository contains the source for nine Buckswood Resolve tools:
 
 - **Buckswood Fake Diagnostic v2.2** - a supervisor-style diagnostic overlay for AI, CG, and compositing shots that feel fake.
 - **Buckswood Lens Physics v0.5** - lossless Metal/OpenCL acceleration, lens-character simulation, overdrive edge protection, chromatic aberration, bloom, coma, vignette, and IMAX/Dune-inspired presets.
@@ -12,12 +12,13 @@ This repository contains the source for eight Buckswood Resolve tools:
 - **Buckswood Radiance Recover v2.1** - floating-point SDR radiance expansion with an optional HDRTVNet++ cache.
 - **Buckswood Temporal Integrity v2.1** - five-frame repair with confidence and ghost-risk protection.
 - **Buckswood Look DNA v2.2** - three-reference, spatial and five-frame look matching with native Browse / Load file pickers, tone, palette, semantic-region, texture, identity, gamut, and cut protection.
+- **Buckswood DeJitter v1.0** - user-selected regional tracking with symmetric temporal micro-jitter removal, confidence and cut guards, diagnostic overlays, and high-quality resampling.
 
 The primary release target is DaVinci Resolve/OpenFX. Premiere Pro and Nuke builds are packaged as separate host downloads.
 
 Experimental adjacent work is kept in separate folders:
 
-- `premiere_port/` - native Premiere builds for all eight effects.
+- `premiere_port/` - native Premiere builds for the eight current-frame-compatible effects.
 - `Buckswood_AutoGrade_Assistant/` - companion script concept for AI-assisted grading recipes.
 
 ## Host Status
@@ -26,7 +27,7 @@ Experimental adjacent work is kept in separate folders:
 | --- | --- | --- |
 | DaVinci Resolve | OpenFX + DCTL installers | Stable v2 target |
 | Nuke | OpenFX bundle ZIP | Experimental, uses the same OFX cores |
-| Premiere Pro | Native `.prm` / `.bundle` plugins | Beta, all eight effects |
+| Premiere Pro | Native `.prm` / `.bundle` plugins | Beta, eight compatible effects |
 
 ## Downloads
 
@@ -49,6 +50,8 @@ Recommended public assets:
 - `Buckswood_Cinematic_Tools_v2_Installer.pkg`
 - `Buckswood_Look_DNA_v2_Installer.dmg`
 - `Buckswood_Look_DNA_v2_Installer.pkg`
+- `Buckswood_DeJitter_v1_Installer.dmg`
+- `Buckswood_DeJitter_v1_Installer.pkg`
 - `Buckswood_Nuke_OFX_v2.zip`
 - `Buckswood_Premiere_Native_macOS.zip`
 - `Buckswood_Premiere_Native_Windows.zip`
@@ -68,6 +71,7 @@ make -C Buckswood_Cinematic_Tools smoketest
 make -C Buckswood_Cinematic_Tools descriptor-test
 make -C Buckswood_Look_DNA all
 make -C Buckswood_Look_DNA companion-test
+make -C Buckswood_DeJitter all
 ```
 
 macOS bundles:
@@ -79,6 +83,7 @@ make -C Buckswood_AI_Photorealizer bundle
 make -C Buckswood_Film_Emulation bundle
 make -C Buckswood_Cinematic_Tools bundle
 make -C Buckswood_Look_DNA bundle
+make -C Buckswood_DeJitter bundle
 ```
 
 Windows Resolve package from macOS:
