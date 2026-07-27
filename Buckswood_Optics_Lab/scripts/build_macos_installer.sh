@@ -5,16 +5,16 @@ export COPYFILE_DISABLE=1
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APP_NAME="Buckswood DeJitter v1.1"
-IDENTIFIER="com.buckswood.dejitter.installer"
+APP_NAME="Buckswood Optics Lab v1.1"
+IDENTIFIER="com.buckswood.optics.lab.installer"
 VERSION="1.1.0"
-PLUGIN_BUNDLE="BuckswoodDeJitter.ofx.bundle"
+PLUGIN_BUNDLE="BuckswoodOpticsLab.ofx.bundle"
 PKGROOT="$ROOT_DIR/packaging/pkgroot"
 PKG_SCRIPTS="$ROOT_DIR/packaging/scripts"
 RELEASE_DIR="$ROOT_DIR/release"
 DMG_STAGE="$ROOT_DIR/packaging/dmg_stage"
-PKG_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer.pkg"
-DMG_PATH="$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer.dmg"
+PKG_PATH="$RELEASE_DIR/Buckswood_Optics_Lab_v1.1_Installer.pkg"
+DMG_PATH="$RELEASE_DIR/Buckswood_Optics_Lab_v1.1_Installer.dmg"
 NOTARY_PROFILE="${NOTARY_PROFILE:-BuckswoodNotary}"
 
 detect_identity() {
@@ -52,7 +52,10 @@ mkdir -p \
     "$ROOT_DIR/dist/$PLUGIN_BUNDLE" \
     "$PKGROOT/Library/OFX/Plugins/$PLUGIN_BUNDLE"
 
-chmod +x "$PKG_SCRIPTS/preinstall" "$PKG_SCRIPTS/postinstall"
+chmod +x \
+    "$PKG_SCRIPTS/preinstall" \
+    "$PKG_SCRIPTS/postinstall" \
+    "$ROOT_DIR/scripts/install_licensed_assets_only.command"
 /usr/bin/xattr -cr "$PKGROOT" "$DMG_STAGE" >/dev/null 2>&1 || true
 /usr/bin/find "$PKGROOT" "$DMG_STAGE" -name "._*" -delete
 
@@ -68,9 +71,9 @@ if [[ -n "$DEVELOPER_ID_INSTALLER" ]]; then
     productsign \
         --sign "$DEVELOPER_ID_INSTALLER" \
         "$PKG_PATH" \
-        "$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer_Signed.pkg"
+        "$RELEASE_DIR/Buckswood_Optics_Lab_v1.1_Installer_Signed.pkg"
     mv \
-        "$RELEASE_DIR/Buckswood_DeJitter_v1.1_Installer_Signed.pkg" \
+        "$RELEASE_DIR/Buckswood_Optics_Lab_v1.1_Installer_Signed.pkg" \
         "$PKG_PATH"
 fi
 
@@ -86,6 +89,9 @@ cp "$PKG_PATH" "$DMG_STAGE/"
 cp "$ROOT_DIR/packaging/DMG_README.txt" "$DMG_STAGE/README.txt"
 cp "$ROOT_DIR/DOCUMENTATION_DE.md" "$DMG_STAGE/"
 cp "$ROOT_DIR/DOCUMENTATION_EN.md" "$DMG_STAGE/"
+cp \
+    "$ROOT_DIR/scripts/install_licensed_assets_only.command" \
+    "$DMG_STAGE/Install_Licensed_Glass_Assets.command"
 hdiutil create \
     -volname "$APP_NAME" \
     -srcfolder "$DMG_STAGE" \
@@ -109,9 +115,9 @@ fi
 (
     cd "$RELEASE_DIR"
     shasum -a 256 \
-        Buckswood_DeJitter_v1.1_Installer.pkg \
-        Buckswood_DeJitter_v1.1_Installer.dmg \
-        > Buckswood_DeJitter_v1.1_SHA256SUMS.txt
+        Buckswood_Optics_Lab_v1.1_Installer.pkg \
+        Buckswood_Optics_Lab_v1.1_Installer.dmg \
+        > Buckswood_Optics_Lab_v1.1_SHA256SUMS.txt
 )
 
 echo "Built $PKG_PATH"

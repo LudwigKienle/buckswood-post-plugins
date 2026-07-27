@@ -130,33 +130,129 @@ float correlationAt(
         return -1.0f;
     }
 
-    float candidateMean = 0.0f;
-    for (const Vec2 offset : patch.offsets) {
-        candidateMean += luma(
+    float covariance = 0.0f;
+    float candidateSum = 0.0f;
+    float candidateSquareSum = 0.0f;
+    for (std::size_t index = 0; index < patch.offsets.size(); ++index) {
+        const Vec2 offset = patch.offsets[index];
+        const float value = luma(
             candidate.sample(
                 centerX + dx + offset.x,
                 centerY + dy + offset.y));
-    }
-    candidateMean /= static_cast<float>(patch.offsets.size());
-
-    float covariance = 0.0f;
-    float candidateVariance = 0.0f;
-    for (std::size_t index = 0; index < patch.offsets.size(); ++index) {
-        const Vec2 offset = patch.offsets[index];
-        const float value =
-            luma(
-                candidate.sample(
-                    centerX + dx + offset.x,
-                    centerY + dy + offset.y)) -
-            candidateMean;
+        candidateSum += value;
+        candidateSquareSum += value * value;
         covariance += patch.centeredLuma[index] * value;
-        candidateVariance += value * value;
     }
+    const float count = static_cast<float>(patch.offsets.size());
+    const float candidateVariance = std::max(
+        0.0f,
+        candidateSquareSum - candidateSum * candidateSum / count);
     const float denominator =
         std::sqrt(patch.variance * candidateVariance);
     return denominator > 1.0e-8f
         ? std::clamp(covariance / denominator, -1.0f, 1.0f)
         : -1.0f;
+}
+
+float textureScore(
+    const Sampler& sampler,
+    float centerX,
+    float centerY,
+    float sampleStep)
+{
+    float gradientEnergy = 0.0f;
+    float sum = 0.0f;
+    float squareSum = 0.0f;
+    int count = 0;
+    for (int gy = -1; gy <= 1; ++gy) {
+        for (int gx = -1; gx <= 1; ++gx) {
+            const float px =
+                centerX + static_cast<float>(gx) * sampleStep;
+            const float py =
+                centerY + static_cast<float>(gy) * sampleStep;
+            const float value = luma(sampler.sample(px, py));
+            const float right = luma(
+                sampler.sample(px + sampleStep, py));
+            const float up = luma(
+                sampler.sample(px, py + sampleStep));
+            const float dx = right - value;
+            const float dy = up - value;
+            gradientEnergy += dx * dx + dy * dy;
+            sum += value;
+            squareSum += value * value;
+            ++count;
+        }
+    }
+    const float variance =
+        count > 0
+        ? std::max(
+              0.0f,
+              squareSum - sum * sum / static_cast<float>(count))
+        : 0.0f;
+    return gradientEnergy + variance * 0.35f;
+}
+
+Vec2 snapToTexture(
+    const Sampler& sampler,
+    Bounds bounds,
+    Vec2 requested,
+    float halfWidth,
+    float halfHeight,
+    int radius)
+{
+    const float minX = static_cast<float>(bounds.x1) + halfWidth;
+    const float maxX = static_cast<float>(bounds.x2 - 1) - halfWidth;
+    const float minY = static_cast<float>(bounds.y1) + halfHeight;
+    const float maxY = static_cast<float>(bounds.y2 - 1) - halfHeight;
+    const int clampedRadius = std::clamp(radius, 0, 96);
+    if (clampedRadius <= 0 || minX > maxX || minY > maxY) {
+        return requested;
+    }
+
+    const float sampleStep = std::max(
+        1.0f,
+        std::min(halfWidth, halfHeight) / 6.0f);
+    const int scanStep = std::max(2, clampedRadius / 4);
+    Vec2 best = requested;
+    const float baseScore = textureScore(
+        sampler,
+        requested.x,
+        requested.y,
+        sampleStep);
+    float bestWeightedScore = baseScore;
+
+    for (int oy = -clampedRadius; oy <= clampedRadius; oy += scanStep) {
+        for (int ox = -clampedRadius; ox <= clampedRadius; ox += scanStep) {
+            const float distance = std::sqrt(
+                static_cast<float>(ox * ox + oy * oy));
+            if (distance > static_cast<float>(clampedRadius)) {
+                continue;
+            }
+            const Vec2 candidate{
+                std::clamp(requested.x + static_cast<float>(ox), minX, maxX),
+                std::clamp(requested.y + static_cast<float>(oy), minY, maxY),
+            };
+            const float proximity =
+                1.0f -
+                0.18f * distance /
+                    static_cast<float>(clampedRadius);
+            const float score =
+                textureScore(
+                    sampler,
+                    candidate.x,
+                    candidate.y,
+                    sampleStep) *
+                proximity;
+            if (score > bestWeightedScore) {
+                bestWeightedScore = score;
+                best = candidate;
+            }
+        }
+    }
+
+    return bestWeightedScore > baseScore * 1.05f + 1.0e-7f
+        ? best
+        : requested;
 }
 
 bool patchFits(
@@ -433,17 +529,36 @@ TrackingResult DeJitterCore::analyze(
             static_cast<float>(frame.height) *
                 std::clamp(controls.regionHeight, 0.01f, 0.50f) *
                 0.5f));
-    const float centerX = std::clamp(
+    const float requestedCenterX = std::clamp(
         controls.trackX,
         static_cast<float>(bounds.x1) + requestedHalfWidth,
         static_cast<float>(bounds.x2 - 1) - requestedHalfWidth);
-    const float centerY = std::clamp(
+    const float requestedCenterY = std::clamp(
         controls.trackY,
         static_cast<float>(bounds.y1) + requestedHalfHeight,
         static_cast<float>(bounds.y2 - 1) - requestedHalfHeight);
+    result.requestedTrackCenter =
+        Vec2{requestedCenterX, requestedCenterY};
+    const Vec2 analysisCenter =
+        controls.textureSnap
+        ? snapToTexture(
+              current,
+              bounds,
+              result.requestedTrackCenter,
+              requestedHalfWidth,
+              requestedHalfHeight,
+              controls.textureSnapRadius)
+        : result.requestedTrackCenter;
+    const float centerX = analysisCenter.x;
+    const float centerY = analysisCenter.y;
     result.regionHalfWidth = requestedHalfWidth;
     result.regionHalfHeight = requestedHalfHeight;
-    result.trackCenter = Vec2{centerX, centerY};
+    result.trackCenter = analysisCenter;
+    result.pointSnapped =
+        length(Vec2{
+            analysisCenter.x - requestedCenterX,
+            analysisCenter.y - requestedCenterY,
+        }) > 0.5f;
 
     int gridSize = 9;
     int coarseStep = 4;
@@ -595,6 +710,16 @@ Pixel DeJitterCore::processPixel(
         return original;
     }
 
+    if (controls.viewMode == ViewConfidence) {
+        const float confidence = tracking.confidence;
+        return Pixel{
+            confidence,
+            confidence,
+            confidence,
+            original.a,
+        };
+    }
+
     const Bounds bounds = current.bounds();
     const float centerX =
         0.5f *
@@ -602,6 +727,7 @@ Pixel DeJitterCore::processPixel(
     const float centerY =
         0.5f *
         static_cast<float>(bounds.y1 + bounds.y2 - 1);
+    const float outputMix = clamp01(controls.outputMix);
     const float zoom =
         controls.edgeMode == EdgeAutoZoom
         ? std::max(1.0f, tracking.autoZoom)
@@ -635,27 +761,21 @@ Pixel DeJitterCore::processPixel(
             static_cast<float>(bounds.y2 - 1));
     }
 
-    Pixel stabilized = current.sampleHighQuality(
-        sourceX,
-        sourceY,
-        controls.interpolation);
-    stabilized.a = original.a +
-        (stabilized.a - original.a) *
-            clamp01(controls.outputMix);
-    Pixel result = mix(
-        original,
-        stabilized,
-        clamp01(controls.outputMix));
-    result.a = stabilized.a;
-
-    if (controls.viewMode == ViewConfidence) {
-        const float confidence = tracking.confidence;
-        return Pixel{
-            confidence,
-            confidence,
-            confidence,
-            original.a,
-        };
+    Pixel result = original;
+    const bool hasTransform =
+        tracking.valid &&
+        (std::fabs(tracking.correction.x) > 1.0e-5f ||
+         std::fabs(tracking.correction.y) > 1.0e-5f ||
+         std::fabs(zoom - 1.0f) > 1.0e-6f);
+    if (outputMix > 0.0f && hasTransform) {
+        Pixel stabilized = current.sampleHighQuality(
+            sourceX,
+            sourceY,
+            controls.interpolation);
+        stabilized.a = original.a +
+            (stabilized.a - original.a) * outputMix;
+        result = mix(original, stabilized, outputMix);
+        result.a = stabilized.a;
     }
     if (controls.viewMode == ViewDifference) {
         return Pixel{
@@ -697,6 +817,23 @@ Pixel DeJitterCore::processPixel(
              std::fabs(py - trackY) <= 10.0f) ||
             (std::fabs(py - trackY) <= lineThickness &&
              std::fabs(px - trackX) <= 10.0f);
+        const float requestedX = tracking.requestedTrackCenter.x;
+        const float requestedY = tracking.requestedTrackCenter.y;
+        const bool onRequestedCross =
+            tracking.pointSnapped &&
+            ((std::fabs(px - requestedX) <= lineThickness &&
+              std::fabs(py - requestedY) <= 7.0f) ||
+             (std::fabs(py - requestedY) <= lineThickness &&
+              std::fabs(px - requestedX) <= 7.0f));
+        const bool onSnapLine =
+            tracking.pointSnapped &&
+            distanceToSegment(
+                px,
+                py,
+                requestedX,
+                requestedY,
+                trackX,
+                trackY) <= lineThickness;
         const float vectorEndX =
             trackX + tracking.correction.x * 8.0f;
         const float vectorEndY =
@@ -727,6 +864,8 @@ Pixel DeJitterCore::processPixel(
             : result;
         if (
             onCross ||
+            onRequestedCross ||
+            onSnapLine ||
             onVector ||
             (controls.viewMode == ViewTrackingRegion && onRegion)) {
             base = mix(
