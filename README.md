@@ -2,7 +2,7 @@
 
 Free cinematic post-production tools for DaVinci Resolve, with native Premiere Pro and experimental Nuke packages.
 
-This repository contains the source for ten Buckswood Resolve tools:
+This repository contains the source for eleven Buckswood Resolve tools:
 
 - **Buckswood Fake Diagnostic v2.2** - a supervisor-style diagnostic overlay for AI, CG, and compositing shots that feel fake.
 - **Buckswood Lens Physics v0.5** - lossless Metal/OpenCL acceleration, lens-character simulation, overdrive edge protection, chromatic aberration, bloom, coma, vignette, and IMAX/Dune-inspired presets.
@@ -14,6 +14,7 @@ This repository contains the source for ten Buckswood Resolve tools:
 - **Buckswood Look DNA v2.2** - three-reference, spatial and five-frame look matching with native Browse / Load file pickers, tone, palette, semantic-region, texture, identity, gamut, and cut protection.
 - **Buckswood DeJitter v1.0** - user-selected regional tracking with symmetric temporal micro-jitter removal, confidence and cut guards, diagnostic overlays, and high-quality resampling.
 - **Buckswood Optics Lab v1.2** - lossless Metal acceleration, coherent Lens recipes, in-plug-in Glass/Dirt/Smudge selectors, alpha-depth defocus, diffusion, flare, debayer character, and grain.
+- **Buckswood Deband v1.0** - multi-scale false-contour repair with edge/texture guards, targeted deterministic dither, HDR float preservation, and Resolve/Baselight packages.
 
 The primary release target is DaVinci Resolve/OpenFX. Premiere Pro and Nuke builds are packaged as separate host downloads.
 
@@ -27,6 +28,7 @@ Experimental adjacent work is kept in separate folders:
 | Host | Package | Status |
 | --- | --- | --- |
 | DaVinci Resolve | OpenFX + DCTL installers | Stable v2 target |
+| Baselight | OpenFX bundle for macOS/Linux | Deband v1.0 cross-host target |
 | Nuke | OpenFX bundle ZIP | Experimental, uses the same OFX cores |
 | Premiere Pro | Native `.prm` / `.bundle` plugins | Beta, eight compatible effects |
 
@@ -74,6 +76,7 @@ make -C Buckswood_Look_DNA all
 make -C Buckswood_Look_DNA companion-test
 make -C Buckswood_DeJitter all
 make -C Buckswood_Optics_Lab all
+make -C Buckswood_Deband all benchmark
 ```
 
 macOS bundles:
@@ -87,6 +90,7 @@ make -C Buckswood_Cinematic_Tools bundle
 make -C Buckswood_Look_DNA bundle
 make -C Buckswood_DeJitter bundle
 make -C Buckswood_Optics_Lab bundle
+make -C Buckswood_Deband bundle
 ```
 
 Windows Resolve package from macOS:

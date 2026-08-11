@@ -17,6 +17,11 @@ The other Resolve OFX plugins use Resolve's `OfxMultiThreadSuiteV1` worker
 pool. This avoids creating a new set of operating-system threads for every
 node and frame, and lets Resolve coordinate concurrent clips and nodes.
 
+Buckswood Deband v1.0 uses the same host worker pool in Resolve and Baselight.
+Its frame-constant thresholds, radii, quantization step, and preset trims are
+prepared once per render. The detector then performs one bounded three-scale
+pass with no full-frame copy, frame cache, or temporary image allocation.
+
 As of suite v2.4.0, the CPU-heavy plugins also move frame-constant work out of
 their pixel loops. Fake Diagnostic, Film Emulation, Frame Director, Radiance
 Recover, and Temporal Integrity build immutable prepared state once per

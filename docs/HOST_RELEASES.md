@@ -22,6 +22,7 @@ Included tools:
 - Buckswood Temporal Integrity v2.1
 - Buckswood Look DNA v2.2
 - Buckswood DeJitter v1.0
+- Buckswood Deband v1.0
 
 Additional standalone macOS assets:
 
@@ -35,6 +36,21 @@ Additional standalone macOS assets:
 - `Buckswood_DeJitter_v1_Installer.dmg`
 
 The Cinematic Tools suite and Film Emulation are included in the unified Windows setup and manual ZIP.
+
+## Baselight
+
+Status: supported by the Buckswood Deband v1.0 host-neutral OFX core.
+
+Release assets:
+
+- `Buckswood_Deband_v1.0_macOS.zip`
+- `Buckswood_Deband_v1.0_Linux_Baselight.zip`
+
+The Deband core is frame-order independent, advertises no temporal clip
+access, requires no sequential render, and keeps no hidden previous-frame
+state. The static dither mode is identical at every frame; the optional
+frame-indexed mode is still a deterministic function of the requested OFX
+time. Linux uses the standard `Contents/Linux-x86-64` bundle layout.
 
 ## Nuke
 
