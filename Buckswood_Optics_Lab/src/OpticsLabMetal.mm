@@ -40,6 +40,11 @@ struct Params {
     int dirtHeight;
     int smudgeWidth;
     int smudgeHeight;
+    int defocusSamples;
+    int glowSamples;
+    int comaSamples;
+    int irisBlades;
+    int maxStarSpokes;
 
     float distortion;
     float breathing;
@@ -93,6 +98,11 @@ struct Params {
     float anamorphicCos;
     float anamorphicSin;
     float isoGrainScale;
+    float fStop;
+    float irisRoundness;
+    float irisRotation;
+    float starUnevenness;
+    float starGate;
 };
 
 inline float clamp01(float value)
@@ -194,6 +204,29 @@ inline float hashNoise(int x, int y, int frame, float seed)
     h *= 0x85ebca6bu;
     h ^= h >> 16;
     return float(h & 0x00ffffffu) / 8388607.5f - 1.0f;
+}
+
+inline float proceduralIris(
+    float x,
+    float y,
+    int blades,
+    float roundness,
+    float rotation)
+{
+    const float radius = sqrt(x * x + y * y);
+    if (blades < 3) {
+        return clamp01(1.0f - opticsSmoothstep(0.88f, 1.02f, radius));
+    }
+    const float pi = 3.14159265358979323846f;
+    const float sector = 2.0f * pi / float(blades);
+    float theta = atan2(y, x) - rotation;
+    theta -= sector * floor(theta / sector + 0.5f);
+    const float polygonRadius =
+        cos(pi / float(blades)) / max(0.05f, cos(theta));
+    const float boundary =
+        polygonRadius * (1.0f - roundness) + roundness;
+    return clamp01(
+        1.0f - opticsSmoothstep(boundary * 0.82f, boundary, radius));
 }
 
 inline float4 sanitizePixel(float4 pixel, float4 fallback)
@@ -365,7 +398,7 @@ inline float4 processOpticsPixel(
     if (comaStrength > 0.0001f) {
         float3 comet = float3(0.0f);
         float weightSum = 0.0f;
-        for (int i = 1; i <= 4; ++i) {
+        for (int i = 1; i <= p.comaSamples; ++i) {
             const float fi = float(i);
             const float spread = fi * (1.0f + comaStrength * 4.5f);
             const float4 sample = sampleSource(
@@ -389,7 +422,7 @@ inline float4 processOpticsPixel(
         }
     }
 
-    float depthError = abs(p.focusOffset);
+    float signedDepthError = p.focusOffset;
     if (p.depthSource == 1) {
         float depth = clamp01(
             (clamp01(dry.a) - p.depthNear) /
@@ -398,8 +431,10 @@ inline float4 processOpticsPixel(
             depth = 1.0f - depth;
         }
         depth = pow(max(0.000001f, depth), p.depthGamma);
-        depthError = abs(depth - p.focusPlane);
+        signedDepthError = depth - p.focusPlane;
     }
+    const float depthError = abs(signedDepthError);
+    const float foregroundMirror = signedDepthError < 0.0f ? -1.0f : 1.0f;
     const float defocusStrength =
         p.defocus * p.amount * p.apertureScale *
         clamp01(depthError) * (1.0f - guard * 0.55f);
@@ -423,17 +458,17 @@ inline float4 processOpticsPixel(
         };
         float3 blur = center.rgb * 2.0f;
         float weightSum = 2.0f;
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < p.defocusSamples; ++i) {
             const float ellipseX = offsets[i].x * horizontal;
             const float ellipseY = offsets[i].y * vertical;
             const float ox =
                 ellipseX * p.anamorphicCos -
                 ellipseY * p.anamorphicSin -
-                dirX * catEye * radiusPx * 0.45f;
+                dirX * catEye * radiusPx * 0.45f * foregroundMirror;
             const float oy =
                 ellipseX * p.anamorphicSin +
                 ellipseY * p.anamorphicCos -
-                dirY * catEye * radiusPx * 0.45f;
+                dirY * catEye * radiusPx * 0.45f * foregroundMirror;
             const float4 sample = sampleSource(
                 source,
                 srcX + ox,
@@ -447,6 +482,18 @@ inline float4 processOpticsPixel(
                     p.apertureHeight,
                     offsets[i].x * 0.5f + 0.5f,
                     offsets[i].y * 0.5f + 0.5f);
+                weight =
+                    1.0f +
+                    (0.15f + apertureWeight * 1.70f - 1.0f) *
+                    p.apertureInfluence;
+            } else if (p.irisBlades >= 3) {
+                const float apertureWeight = proceduralIris(
+                    offsets[i].x,
+                    offsets[i].y,
+                    p.irisBlades,
+                    p.irisRoundness,
+                    p.irisRotation +
+                        (foregroundMirror < 0.0f ? 3.14159265358979323846f : 0.0f));
                 weight =
                     1.0f +
                     (0.15f + apertureWeight * 1.70f - 1.0f) *
@@ -476,7 +523,7 @@ inline float4 processOpticsPixel(
         };
         float3 glow = float3(0.0f);
         float hotWeight = 0.0f;
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < p.glowSamples; ++i) {
             const float4 sample = sampleSource(
                 source,
                 srcX + offsets[i].x * radiusPx,
@@ -554,25 +601,39 @@ inline float4 processOpticsPixel(
             (left.b * hotLeft + right.b * hotRight) * amount;
     }
 
-    const float starStrength = p.starburst * p.amount;
+    const float physicalStarGate = opticsSmoothstep(8.0f, 22.0f, p.fStop);
+    const float starResponse =
+        (1.0f - p.starGate) + p.starGate * physicalStarGate;
+    const float starStrength = p.starburst * p.amount * starResponse;
     if (starStrength > 0.0001f) {
         const float starRadius = 4.0f + starStrength * 18.0f;
-        const float4 horizontalA =
-            sampleSource(source, srcX - starRadius, srcY, p);
-        const float4 horizontalB =
-            sampleSource(source, srcX + starRadius, srcY, p);
-        const float4 verticalA =
-            sampleSource(source, srcX, srcY - starRadius, p);
-        const float4 verticalB =
-            sampleSource(source, srcX, srcY + starRadius, p);
-        const float4 star =
-            horizontalA + horizontalB + verticalA + verticalB;
+        int spokeCount = 4;
+        if (p.irisBlades >= 3) {
+            spokeCount = p.irisBlades % 2 == 0
+                ? p.irisBlades
+                : p.irisBlades * 2;
+            spokeCount = min(spokeCount, p.maxStarSpokes);
+        }
+        float3 star = float3(0.0f);
+        for (int spoke = 0; spoke < spokeCount; ++spoke) {
+            const float normalized = float(spoke) / float(max(1, spokeCount));
+            const float angle =
+                p.irisRotation + normalized * 6.28318530717958647692f;
+            const float uneven = 1.0f + p.starUnevenness *
+                sin(float(spoke * 17 + 3)) * 0.28f;
+            star += sampleSource(
+                source,
+                srcX + cos(angle) * starRadius * uneven,
+                srcY + sin(angle) * starRadius * uneven,
+                p).rgb;
+        }
         const float hot = opticsSmoothstep(
             p.bloomThreshold * 4.0f,
             p.bloomThreshold * 4.0f + 2.0f,
-            opticsLuma(star));
-        const float amount = starStrength * hot * 0.055f;
-        result.rgb += star.rgb * amount;
+            dot(star, float3(0.2627f, 0.6780f, 0.0593f)));
+        const float amount =
+            starStrength * hot * 0.22f / float(max(1, spokeCount));
+        result.rgb += star * amount;
     }
 
     const float sensorStrength = p.debayer * p.amount;
@@ -742,6 +803,11 @@ struct MetalParams {
     int dirtHeight;
     int smudgeWidth;
     int smudgeHeight;
+    int defocusSamples;
+    int glowSamples;
+    int comaSamples;
+    int irisBlades;
+    int maxStarSpokes;
 
     float distortion;
     float breathing;
@@ -795,6 +861,11 @@ struct MetalParams {
     float anamorphicCos;
     float anamorphicSin;
     float isoGrainScale;
+    float fStop;
+    float irisRoundness;
+    float irisRotation;
+    float starUnevenness;
+    float starGate;
 };
 
 struct Pipelines {
@@ -989,6 +1060,11 @@ bool runOpticsLabMetal(
     params.dirtHeight = assets.dirt.height;
     params.smudgeWidth = assets.smudge.width;
     params.smudgeHeight = assets.smudge.height;
+    params.defocusSamples = state.defocusSamples;
+    params.glowSamples = state.glowSamples;
+    params.comaSamples = state.comaSamples;
+    params.irisBlades = state.irisBlades;
+    params.maxStarSpokes = state.maxStarSpokes;
 
     params.distortion = model.distortion;
     params.breathing = model.breathing;
@@ -1042,6 +1118,11 @@ bool runOpticsLabMetal(
     params.anamorphicCos = state.anamorphicCos;
     params.anamorphicSin = state.anamorphicSin;
     params.isoGrainScale = state.isoGrainScale;
+    params.fStop = controls.fStop;
+    params.irisRoundness = state.irisRoundness;
+    params.irisRotation = state.irisRotation;
+    params.starUnevenness = state.starUnevenness;
+    params.starGate = state.starGate;
 
     id<MTLCommandBuffer> commandBuffer = [queue commandBuffer];
     commandBuffer.label = @"Buckswood Optics Lab";

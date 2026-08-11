@@ -36,7 +36,7 @@ OfxMultiThreadSuiteV1* gThreadHost = nullptr;
 
 constexpr const char* kPluginIdentifier = "com.buckswood.optics.lab";
 constexpr int kPluginMajorVersion = 1;
-constexpr int kPluginMinorVersion = 2;
+constexpr int kPluginMinorVersion = 3;
 
 struct ImageInfo {
     void* data = nullptr;
@@ -206,6 +206,22 @@ buckswood_optics::Controls controlsAtTime(OfxImageEffectHandle instance, OfxTime
 
     c.edgeGuard = static_cast<float>(doubleParamAtTime(instance, "edgeGuard", time, 0.80));
     c.outputMix = static_cast<float>(doubleParamAtTime(instance, "outputMix", time, 0.65));
+
+    c.geometryEnabled = intParamAtTime(instance, "geometryEnabled", time, 1) != 0;
+    c.aberrationsEnabled = intParamAtTime(instance, "aberrationsEnabled", time, 1) != 0;
+    c.defocusEnabled = intParamAtTime(instance, "defocusEnabled", time, 1) != 0;
+    c.lightEnabled = intParamAtTime(instance, "lightEnabled", time, 1) != 0;
+    c.vignetteEnabled = intParamAtTime(instance, "vignetteEnabled", time, 1) != 0;
+    c.surfaceEnabled = intParamAtTime(instance, "surfaceEnabled", time, 1) != 0;
+    c.sensorEnabled = intParamAtTime(instance, "sensorEnabled", time, 1) != 0;
+    c.quality = intParamAtTime(instance, "quality", time, 1);
+    c.sceneUnits = intParamAtTime(instance, "sceneUnits", time, 0);
+    c.sceneScale = static_cast<float>(doubleParamAtTime(instance, "sceneScale", time, 1.0));
+    c.irisBlades = intParamAtTime(instance, "irisBlades", time, 0);
+    c.irisRoundnessTrim = static_cast<float>(doubleParamAtTime(instance, "irisRoundnessTrim", time, 0.0));
+    c.irisRotation = static_cast<float>(doubleParamAtTime(instance, "irisRotation", time, 0.0));
+    c.starUnevennessTrim = static_cast<float>(doubleParamAtTime(instance, "starUnevennessTrim", time, 0.0));
+    c.starFStopResponse = static_cast<float>(doubleParamAtTime(instance, "starFStopResponse", time, 1.0));
     return c;
 }
 
@@ -636,7 +652,7 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     gEffectHost->getParamSet(effect, &paramSet);
     OfxPropertySetHandle page = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypePage, "Main", &page);
-    gPropHost->propSetString(page, kOfxPropLabel, 0, "Optics Lab v1.2");
+    gPropHost->propSetString(page, kOfxPropLabel, 0, "Optics Lab v1.3");
 
     int p = 0;
     constexpr const char* kLensGroup = "lensGroup";
@@ -647,6 +663,7 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     constexpr const char* kVignetteGroup = "vignetteGroup";
     constexpr const char* kSurfaceGroup = "surfaceGroup";
     constexpr const char* kSensorGroup = "sensorGroup";
+    constexpr const char* kWorkflowGroup = "workflowGroup";
     defineGroupParam(paramSet, kLensGroup, "01  Lens State & Focus", true);
     defineGroupParam(paramSet, kDistortionGroup, "02  Distortion & Field", true);
     defineGroupParam(paramSet, kChromaticGroup, "03  Chromatic Aberration", true);
@@ -655,6 +672,7 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     defineGroupParam(paramSet, kVignetteGroup, "06  Vignetting", true);
     defineGroupParam(paramSet, kSurfaceGroup, "07  Dirt & Smudge", true);
     defineGroupParam(paramSet, kSensorGroup, "08  Sensor & Output", false);
+    defineGroupParam(paramSet, kWorkflowGroup, "09  Workflow & Performance", false);
 
     const char* presets[] = {
         "Neutral / Manual",
@@ -666,9 +684,21 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
         "AI Deplastic",
         "Large Format Clean",
         "Dream Diffusion",
+        "Clean Modern",
+        "Classic Spherical",
+        "Vintage Swirl",
+        "Soft Focus Portrait",
+        "Anamorphic Classic 2x",
+        "Anamorphic Blue 1.8x",
+        "Vintage Flare",
+        "Clinical APO",
+        "Rangefinder Tele",
+        "Retrofocus Wide",
+        "Modern Zoom",
+        "AI Natural Lens",
     };
     defineChoiceParam(
-        paramSet, "preset", "Lens", 6, presets, 9, p++, page, kLensGroup,
+        paramSet, "preset", "Lens", 6, presets, 21, p++, page, kLensGroup,
         "Selects a coherent optical recipe. The controls below remain available as trims.");
     defineDoubleParam(
         paramSet, "effectStrength", "Lens Strength", 0.65, 0.0, 1.0,
@@ -680,7 +710,7 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
         paramSet, "fStop", "F-Stop", 2.8, 0.7, 32.0,
         p++, page, kLensGroup);
     defineDoubleParam(
-        paramSet, "focusDistance", "Focus Distance (m)", 3.0, 0.2, 1000.0,
+        paramSet, "focusDistance", "Focus Distance", 3.0, 0.0002, 1000.0,
         p++, page, kLensGroup);
     defineDoubleParam(
         paramSet, "breathing", "Focus Breathing", 0.0, -1.0, 1.0,
@@ -854,8 +884,62 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
         paramSet, "outputMix", "Output Mix", 0.65, 0.0, 1.0,
         p++, page, kSensorGroup);
 
+    const char* qualityOptions[] = {"Preview", "Full"};
+    defineChoiceParam(
+        paramSet, "quality", "Render Quality", 1, qualityOptions, 2,
+        p++, page, kWorkflowGroup,
+        "Preview reduces optical samples while preserving the same stage model. Full is the v1.2-compatible render path.");
+    defineBooleanParam(
+        paramSet, "geometryEnabled", "Enable Geometry", 1,
+        p++, page, kWorkflowGroup);
+    defineBooleanParam(
+        paramSet, "aberrationsEnabled", "Enable Aberrations", 1,
+        p++, page, kWorkflowGroup);
+    defineBooleanParam(
+        paramSet, "defocusEnabled", "Enable Defocus / Iris", 1,
+        p++, page, kWorkflowGroup);
+    defineBooleanParam(
+        paramSet, "lightEnabled", "Enable Light Effects", 1,
+        p++, page, kWorkflowGroup);
+    defineBooleanParam(
+        paramSet, "vignetteEnabled", "Enable Vignette", 1,
+        p++, page, kWorkflowGroup);
+    defineBooleanParam(
+        paramSet, "surfaceEnabled", "Enable Dirt / Smudge", 1,
+        p++, page, kWorkflowGroup);
+    defineBooleanParam(
+        paramSet, "sensorEnabled", "Enable Sensor", 1,
+        p++, page, kWorkflowGroup,
+        "Disabled stages are removed from the render path and cost no image-processing work.");
+
+    const char* sceneUnits[] = {"Meters", "Centimeters", "Millimeters", "Feet", "Inches"};
+    defineChoiceParam(
+        paramSet, "sceneUnits", "Scene Units", 0, sceneUnits, 5,
+        p++, page, kLensGroup);
+    defineDoubleParam(
+        paramSet, "sceneScale", "Scene Scale", 1.0, 0.001, 1000.0,
+        p++, page, kLensGroup,
+        "Converts focus distance to a physical meter scale without changing the shot layout.");
+    defineIntegerParam(
+        paramSet, "irisBlades", "Iris Blades (0 = Lens)", 0, 0, 16,
+        p++, page, kGlassGroup,
+        "Zero uses the selected lens recipe. Values from 3 to 16 override its shared procedural iris.");
+    defineDoubleParam(
+        paramSet, "irisRoundnessTrim", "Iris Roundness Trim", 0.0, -1.0, 1.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "irisRotation", "Iris Rotation", 0.0, -180.0, 180.0,
+        p++, page, kGlassGroup);
+    defineDoubleParam(
+        paramSet, "starUnevennessTrim", "Star Spoke Unevenness", 0.0, -1.0, 1.0,
+        p++, page, kLightGroup);
+    defineDoubleParam(
+        paramSet, "starFStopResponse", "Physical F-Stop Response", 1.0, 0.0, 1.0,
+        p++, page, kLightGroup,
+        "For v1.3 lenses, starbursts emerge near f/8 and reach full response near f/22.");
+
     // Kept serialized and readable for existing projects, but intentionally hidden
-    // from the v1.2 UI. Choice value 0 above falls back to these parameters.
+    // from the current UI. Choice value 0 above falls back to these parameters.
     defineDirectoryParam(
         paramSet,
         "glassAssetRoot",
@@ -884,7 +968,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(props, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.2");
+    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.3");
     gPropHost->propSetString(props, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
 #if defined(__APPLE__)

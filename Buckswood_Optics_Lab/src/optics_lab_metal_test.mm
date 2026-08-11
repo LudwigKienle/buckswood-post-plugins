@@ -411,6 +411,28 @@ int main()
             return 1;
         }
 
+        Controls physicalControls = defaultControls();
+        physicalControls.preset = 15;
+        physicalControls.quality = 0;
+        physicalControls.effectStrength = 0.90f;
+        physicalControls.outputMix = 0.85f;
+        physicalControls.focusOffset = -0.72f;
+        physicalControls.defocus = 0.60f;
+        physicalControls.catEye = 0.35f;
+        physicalControls.fStop = 16.0f;
+        physicalControls.starburst = 0.45f;
+        physicalControls.irisBlades = 5;
+        physicalControls.starUnevennessTrim = 0.25f;
+        if (!validateCase(
+                device,
+                queue,
+                "v1.3 physical iris preview",
+                physicalControls,
+                noAssets)) {
+            std::cerr << "Optics Lab v1.3 Metal quality regression\n";
+            return 1;
+        }
+
         if (!runBenchmark(device, queue)) {
             std::cerr << "Optics Lab Metal benchmark failed\n";
             return 1;

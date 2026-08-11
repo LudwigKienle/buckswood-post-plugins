@@ -178,6 +178,58 @@ int main()
         std::isfinite(apertureResult.r),
         "custom aperture texture produces a valid render");
 
+    Controls preview = defaults();
+    preview.preset = 20;
+    preview.quality = 0;
+    const auto previewState = OpticsLabCore::prepare(frame, preview);
+    require(
+        previewState.defocusSamples == 8 &&
+        previewState.glowSamples == 4 &&
+        previewState.comaSamples == 2,
+        "Preview quality lowers only the expensive optical sample counts");
+
+    Controls bypassed = preview;
+    bypassed.geometryEnabled = false;
+    bypassed.aberrationsEnabled = false;
+    bypassed.defocusEnabled = false;
+    bypassed.lightEnabled = false;
+    bypassed.vignetteEnabled = false;
+    bypassed.surfaceEnabled = false;
+    bypassed.sensorEnabled = false;
+    TestSampler bypassSampler;
+    const Pixel bypassResult = OpticsLabCore::processPixel(
+        bypassSampler,
+        20,
+        17,
+        frame,
+        bypassed);
+    require(
+        bypassSampler.sampleCount == 1 && near(bypassResult.r, dry.r),
+        "disabled stages collapse to the zero-cost identity path");
+
+    Controls metric = defaults();
+    metric.focusDistance = 300.0f;
+    metric.sceneUnits = 1;
+    const auto metricState = OpticsLabCore::prepare(frame, metric);
+    require(
+        near(metricState.focusDistanceMeters, 3.0f),
+        "scene units convert focus distance to meters");
+
+    Controls foreground = defaults();
+    foreground.defocus = 1.0f;
+    foreground.catEye = 1.0f;
+    foreground.fStop = 1.0f;
+    foreground.irisBlades = 5;
+    foreground.focusOffset = -0.8f;
+    const Pixel foregroundResult = OpticsLabCore::processPixel(
+        sampler, 56, 18, frame, foreground);
+    foreground.focusOffset = 0.8f;
+    const Pixel backgroundResult = OpticsLabCore::processPixel(
+        sampler, 56, 18, frame, foreground);
+    require(
+        std::fabs(foregroundResult.r - backgroundResult.r) > 0.0001f,
+        "foreground bokeh mirrors cat-eye and odd iris orientation");
+
     std::cout << "Buckswood Optics Lab core tests passed\n";
     return 0;
 }

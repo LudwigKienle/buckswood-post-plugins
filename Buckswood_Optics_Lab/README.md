@@ -24,8 +24,11 @@ presets, source code, or paid image assets.
 Float renders preserve scene-linear/HDR values above `1.0`. The effect keeps source
 alpha unchanged and includes an edge guard to reduce doubled contours.
 
-V1.2 adds lossless Float32 Metal rendering on macOS, keeps the Resolve worker-pool
-CPU fallback, and retains the full sample count and scene-linear output.
+V1.3 adds modular zero-cost stage switches, Preview/Full quality, physical scene
+units, a shared procedural iris, f-stop-dependent starbursts, corrected foreground
+bokeh orientation, and twelve new independently authored lens recipes. Lossless
+Float32 Metal rendering remains the default macOS path; Windows keeps the optimized
+Resolve worker-pool CPU fallback.
 
 ## Build and test
 
@@ -60,7 +63,7 @@ The script installs:
 ~/Library/Application Support/Buckswood/OpticsLab/GlassAssets
 ```
 
-The v1.2 UI needs no external folder. This optional helper only preserves access to
+The v1.3 UI needs no external folder. This optional helper only preserves access to
 the older 157-image local aperture library for projects that already used its legacy
 indices. Those paid assets remain excluded from public releases.
 

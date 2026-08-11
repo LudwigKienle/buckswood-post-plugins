@@ -189,6 +189,22 @@ int main(int argc, char** argv)
         output.begin(),
         output.end());
 
+    std::vector<Pixel> performanceOutput(output.size());
+    Controls preview = demanding;
+    preview.quality = 0;
+    const double previewMs =
+        renderCase(sampler, preview, performanceOutput);
+    Controls bypassed = demanding;
+    bypassed.geometryEnabled = false;
+    bypassed.aberrationsEnabled = false;
+    bypassed.defocusEnabled = false;
+    bypassed.lightEnabled = false;
+    bypassed.vignetteEnabled = false;
+    bypassed.surfaceEnabled = false;
+    bypassed.sensorEnabled = false;
+    const double bypassedMs =
+        renderCase(sampler, bypassed, performanceOutput);
+
     if (argc == 2) {
         std::ofstream stream(argv[1], std::ios::binary);
         if (!stream) {
@@ -212,6 +228,8 @@ int main(int argc, char** argv)
               << "neutral_ms=" << neutralMs << '\n'
               << "default_ms=" << defaultMs << '\n'
               << "demanding_ms=" << demandingMs << '\n'
+              << "preview_ms=" << previewMs << '\n'
+              << "all_stages_bypassed_ms=" << bypassedMs << '\n'
               << std::setprecision(9)
               << "checksum=" << checksum << '\n';
     return 0;

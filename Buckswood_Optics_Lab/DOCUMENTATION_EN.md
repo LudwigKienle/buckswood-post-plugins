@@ -1,4 +1,4 @@
-# Buckswood Optics Lab v1.2
+# Buckswood Optics Lab v1.3
 
 ## Purpose
 
@@ -8,7 +8,7 @@ digital or AI-generated footage feel photographed rather than mathematically per
 ## Recommended workflow
 
 1. Set the color space and primary grade before Optics Lab.
-2. Start with `AI Deplastic` or `Large Format Clean`.
+2. Start with `AI Natural Lens`, `Clean Modern`, or the compatible `AI Deplastic`.
 3. Match focal length, f-stop, sensor width, and anamorphic squeeze to the shot.
 4. Add aberrations only until digital perfection starts to disappear.
 5. Choose a built-in `Glass` shape and use defocus only where the image should
@@ -21,7 +21,8 @@ digital or AI-generated footage feel photographed rather than mathematically per
 The native OFX panel follows a lens-anatomy sequence without changing the
 underlying processing order: Lens State & Focus, Distortion & Field, Chromatic
 Aberration, Defocus & Bokeh / Glass, Flaring & Bloom, Vignetting, Dirt & Smudge,
-then Sensor & Output. Groups can be collapsed as the look is completed.
+then Sensor & Output and Workflow & Performance. Groups can be collapsed as the
+look is completed.
 
 ### Lens state
 
@@ -29,6 +30,8 @@ then Sensor & Output. Groups can be collapsed as the look is completed.
 - `Focal Length` changes the scale of edge-dependent optical behavior.
 - `F-Stop` strengthens defocus, axial CA, and coma at lower values.
 - `Focus Distance` drives focus breathing.
+- `Scene Units` and `Scene Scale` convert production measurements to meters without
+  forcing users to rewrite shot metadata.
 - `Sensor Width` changes the relationship between image circle and focal length.
 - `Anamorphic Squeeze` shapes bokeh and horizontal streaks.
 - `Anamorphic Axis` rotates the bokeh ellipse and streak direction.
@@ -53,8 +56,13 @@ then Sensor & Output. Groups can be collapsed as the look is completed.
 - `Alpha Depth Gamma`: redistributes focus distances within that range.
 - `Alpha Focus Plane`: alpha depth that remains in focus.
 - `Cat-Eye Bokeh`: clips bokeh toward the edge of frame.
+- `Iris Blades`, `Iris Roundness Trim`, and `Iris Rotation` control one procedural
+  iris shared by defocus and diffraction.
 - `Glass`: selects a built-in circular, polygonal, anamorphic, cat-eye, or vintage
   aperture character without any filesystem setup.
+
+Foreground defocus now mirrors cat-eye displacement and odd-blade orientation, so
+foreground bokeh no longer behaves like a copied background kernel.
 
 Source alpha is preserved at the output. A future multi-input edition can accept a
 separate depth clip without repurposing alpha.
@@ -63,6 +71,8 @@ separate depth clip without repurposing alpha.
 
 - `Bloom`, `Diffusion`, and `Halation` shape highlights at different scales.
 - `Flare Ghosts`, `Anamorphic Streak`, and `Starburst` add lens-light interactions.
+- On v1.3 lens recipes, `Physical F-Stop Response` makes starbursts emerge near f/8
+  and reach full response near f/22. Set it to zero for an unrestricted art control.
 - `Sensor Debayer Character` softens red/blue detail while retaining green detail.
 - `Chroma Detail Smear` reduces unnaturally perfect color resolution.
 - `Sensor Grain` is temporally animated and luminance dependent.
@@ -76,6 +86,23 @@ separate depth clip without repurposing alpha.
 - Each channel has its own Amount and Scale controls.
 - All built-ins are deterministic and cached; they do not add temporal crawling.
 
+## Workflow and performance
+
+- `Render Quality: Full` preserves the v1.2 sampling path and is the compatibility
+  default.
+- `Render Quality: Preview` uses 8 rather than 12 defocus samples, 4 rather than 8
+  glow samples, and 2 rather than 4 coma samples. It does not switch to FP16 or clamp
+  scene-linear values.
+- Seven stage switches independently bypass Geometry, Aberrations, Defocus/Iris,
+  Light Effects, Vignette, Dirt/Smudge, and Sensor processing.
+- A disabled stage is removed before rendering; when every stage is disabled the
+  effect returns after the single source read.
+
+The new recipes are `Clean Modern`, `Classic Spherical`, `Vintage Swirl`, `Soft
+Focus Portrait`, `Anamorphic Classic 2x`, `Anamorphic Blue 1.8x`, `Vintage Flare`,
+`Clinical APO`, `Rangefinder Tele`, `Retrofocus Wide`, `Modern Zoom`, and `AI Natural
+Lens`. Existing preset indices 0-8 remain unchanged.
+
 ## Legacy local Glass assets
 
 The licensed installer copies the local assets to:
@@ -84,18 +111,18 @@ The licensed installer copies the local assets to:
 ~/Library/Application Support/Buckswood/OpticsLab/GlassAssets
 ```
 
-The v1.2 UI does not expose a path browser. Existing project values for the old
+The v1.3 UI does not expose a path browser. Existing project values for the old
 asset path, aperture index, and dirt index remain serialized and render unchanged
 when the new selectors are Off. Paid aperture images are deliberately excluded
 from the public GitHub release.
 
-## V1.2 performance
+## V1.3 performance
 
 macOS Float32 renders use Resolve's Metal buffers, including all built-in asset
 channels. Safe Metal math is compared pixel-by-pixel with the CPU reference.
 Byte renders and unavailable GPU contexts use the Resolve worker-pool CPU path.
-The neutral CPU path returns after its single source read. No path uses FP16,
-reduced tap counts, or proxy resolution.
+Full quality remains lossless relative to v1.2. Preview changes only documented
+sample counts; no path uses FP16 or clamps HDR values.
 
 ## Limitations
 

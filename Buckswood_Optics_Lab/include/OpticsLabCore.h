@@ -102,6 +102,23 @@ struct Controls {
 
     float edgeGuard;
     float outputMix;
+
+    // v1.3 additions use defaults so older hosts/tests keep the v1.2 result.
+    bool geometryEnabled = true;
+    bool aberrationsEnabled = true;
+    bool defocusEnabled = true;
+    bool lightEnabled = true;
+    bool vignetteEnabled = true;
+    bool surfaceEnabled = true;
+    bool sensorEnabled = true;
+    int quality = 1; // 0 = Preview, 1 = Full
+    int sceneUnits = 0;
+    float sceneScale = 1.0f;
+    int irisBlades = 0;
+    float irisRoundnessTrim = 0.0f;
+    float irisRotation = 0.0f;
+    float starUnevennessTrim = 0.0f;
+    float starFStopResponse = 1.0f;
 };
 
 class Sampler {
@@ -135,6 +152,11 @@ public:
         float chromaSmear;
         float grain;
         float warmth;
+        int irisBlades = 0;
+        float irisRoundness = 1.0f;
+        float irisRotation = 0.0f;
+        float starUnevenness = 0.0f;
+        float starGate = 0.0f;
     };
 
     struct PreparedState {
@@ -153,6 +175,16 @@ public:
         float anamorphicCos;
         float anamorphicSin;
         float isoGrainScale;
+        float focusDistanceMeters;
+        int defocusSamples;
+        int glowSamples;
+        int comaSamples;
+        int irisBlades;
+        int maxStarSpokes;
+        float irisRoundness;
+        float irisRotation;
+        float starUnevenness;
+        float starGate;
         bool needsEdgeGuard;
         bool identityMapping;
         bool identityOutput;
@@ -244,6 +276,29 @@ private:
             std::isfinite(p.b) ? p.b : fallback.b,
             fallback.a,
         };
+    }
+
+    static float proceduralIris(
+        float x,
+        float y,
+        int blades,
+        float roundness,
+        float rotation)
+    {
+        if (blades < 3) {
+            return clamp01(1.0f - smoothstep(0.88f, 1.02f, std::sqrt(x * x + y * y)));
+        }
+        const float pi = 3.14159265358979323846f;
+        const float sector = 2.0f * pi / static_cast<float>(blades);
+        float theta = std::atan2(y, x) - rotation;
+        theta -= sector * std::floor(theta / sector + 0.5f);
+        const float polygonRadius =
+            std::cos(pi / static_cast<float>(blades)) /
+            std::max(0.05f, std::cos(theta));
+        const float boundary =
+            polygonRadius * (1.0f - roundness) + roundness;
+        const float radius = std::sqrt(x * x + y * y);
+        return clamp01(1.0f - smoothstep(boundary * 0.82f, boundary, radius));
     }
 };
 
@@ -393,7 +448,7 @@ Pixel OpticsLabCore::processPixel(
     if (comaStrength > 0.0001f) {
         Pixel comet{0.0f, 0.0f, 0.0f, dry.a};
         float weightSum = 0.0f;
-        for (int i = 1; i <= 4; ++i) {
+        for (int i = 1; i <= state.comaSamples; ++i) {
             const float fi = static_cast<float>(i);
             const float spread = fi * (1.0f + comaStrength * 4.5f);
             const Pixel p = sampler.sample(
@@ -414,7 +469,7 @@ Pixel OpticsLabCore::processPixel(
         }
     }
 
-    float depthError = std::fabs(c.focusOffset);
+    float signedDepthError = c.focusOffset;
     if (c.depthSource == 1) {
         float depth = clamp01(
             (clamp01(dry.a) - c.depthNear) /
@@ -425,9 +480,10 @@ Pixel OpticsLabCore::processPixel(
         depth = std::pow(
             std::max(0.000001f, depth),
             c.depthGamma);
-        depthError =
-            std::fabs(depth - c.focusPlane);
+        signedDepthError = depth - c.focusPlane;
     }
+    const float depthError = std::fabs(signedDepthError);
+    const float foregroundMirror = signedDepthError < 0.0f ? -1.0f : 1.0f;
     const float defocusStrength =
         model.defocus * state.amount * state.apertureScale *
         clamp01(depthError) * (1.0f - guard * 0.55f);
@@ -444,23 +500,36 @@ Pixel OpticsLabCore::processPixel(
         };
         Pixel blur = mul(center, 2.0f);
         float weightSum = 2.0f;
-        for (const auto& offset : kOffsets) {
+        for (int sampleIndex = 0; sampleIndex < state.defocusSamples; ++sampleIndex) {
+            const auto& offset = kOffsets[sampleIndex];
             const float ellipseX = offset[0] * horizontal;
             const float ellipseY = offset[1] * vertical;
             const float ox =
                 ellipseX * state.anamorphicCos -
                 ellipseY * state.anamorphicSin -
-                dirX * catEye * radiusPx * 0.45f;
+                dirX * catEye * radiusPx * 0.45f * foregroundMirror;
             const float oy =
                 ellipseX * state.anamorphicSin +
                 ellipseY * state.anamorphicCos -
-                dirY * catEye * radiusPx * 0.45f;
+                dirY * catEye * radiusPx * 0.45f * foregroundMirror;
             const Pixel p = sampler.sample(srcX + ox, srcY + oy);
             float weight = 1.0f;
             if (assets && assets->aperture.valid()) {
                 const float apertureWeight = assets->aperture.sample(
                     offset[0] * 0.5f + 0.5f,
                     offset[1] * 0.5f + 0.5f);
+                weight =
+                    1.0f +
+                    (0.15f + apertureWeight * 1.70f - 1.0f) *
+                    c.apertureInfluence;
+            } else if (state.irisBlades >= 3) {
+                const float apertureWeight = proceduralIris(
+                    offset[0],
+                    offset[1],
+                    state.irisBlades,
+                    state.irisRoundness,
+                    state.irisRotation +
+                        (foregroundMirror < 0.0f ? 3.14159265358979323846f : 0.0f));
                 weight =
                     1.0f +
                     (0.15f + apertureWeight * 1.70f - 1.0f) *
@@ -486,7 +555,8 @@ Pixel OpticsLabCore::processPixel(
         };
         Pixel glow{0.0f, 0.0f, 0.0f, dry.a};
         float hotWeight = 0.0f;
-        for (const auto& offset : kOffsets) {
+        for (int sampleIndex = 0; sampleIndex < state.glowSamples; ++sampleIndex) {
+            const auto& offset = kOffsets[sampleIndex];
             const Pixel p = sampler.sample(
                 srcX + offset[0] * radiusPx,
                 srcY + offset[1] * radiusPx);
@@ -546,21 +616,38 @@ Pixel OpticsLabCore::processPixel(
         result.b += (left.b * hotLeft + right.b * hotRight) * amount;
     }
 
-    const float starStrength = model.starburst * state.amount;
+    const float physicalStarGate = smoothstep(8.0f, 22.0f, c.fStop);
+    const float starResponse =
+        (1.0f - state.starGate) + state.starGate * physicalStarGate;
+    const float starStrength = model.starburst * state.amount * starResponse;
     if (starStrength > 0.0001f) {
         const float starRadius = 4.0f + starStrength * 18.0f;
-        const Pixel horizontalA = sampler.sample(srcX - starRadius, srcY);
-        const Pixel horizontalB = sampler.sample(srcX + starRadius, srcY);
-        const Pixel verticalA = sampler.sample(srcX, srcY - starRadius);
-        const Pixel verticalB = sampler.sample(srcX, srcY + starRadius);
-        const Pixel star{
-            horizontalA.r + horizontalB.r + verticalA.r + verticalB.r,
-            horizontalA.g + horizontalB.g + verticalA.g + verticalB.g,
-            horizontalA.b + horizontalB.b + verticalA.b + verticalB.b,
-            dry.a,
-        };
+        Pixel star{0.0f, 0.0f, 0.0f, dry.a};
+        int spokeCount = 4;
+        if (state.irisBlades >= 3) {
+            spokeCount = state.irisBlades % 2 == 0
+                ? state.irisBlades
+                : state.irisBlades * 2;
+            spokeCount = std::min(spokeCount, state.maxStarSpokes);
+        }
+        for (int spoke = 0; spoke < spokeCount; ++spoke) {
+            const float normalized = static_cast<float>(spoke) /
+                static_cast<float>(std::max(1, spokeCount));
+            const float angle =
+                state.irisRotation + normalized * 6.28318530717958647692f;
+            const float uneven = 1.0f + state.starUnevenness *
+                std::sin(static_cast<float>(spoke * 17 + 3)) * 0.28f;
+            const Pixel ray = sampler.sample(
+                srcX + std::cos(angle) * starRadius * uneven,
+                srcY + std::sin(angle) * starRadius * uneven);
+            star.r += ray.r;
+            star.g += ray.g;
+            star.b += ray.b;
+        }
         const float hot = smoothstep(c.bloomThreshold * 4.0f, c.bloomThreshold * 4.0f + 2.0f, luma(star));
-        const float amount = starStrength * hot * 0.055f;
+        const float amount =
+            starStrength * hot * 0.22f /
+            static_cast<float>(std::max(1, spokeCount));
         result.r += star.r * amount;
         result.g += star.g * amount;
         result.b += star.b * amount;

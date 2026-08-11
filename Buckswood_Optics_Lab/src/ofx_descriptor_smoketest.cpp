@@ -246,7 +246,7 @@ int main(int argc, char** argv)
         std::strcmp(plugin->pluginIdentifier, "com.buckswood.optics.lab") == 0,
         "plugin identifier matches");
     require(plugin->pluginVersionMajor == 1, "plugin exposes v1 major version");
-    require(plugin->pluginVersionMinor == 2, "plugin exposes v1.2 minor version");
+    require(plugin->pluginVersionMinor == 3, "plugin exposes v1.3 minor version");
     require(plugin->mainEntry != nullptr, "plugin main entry exists");
     require(getPlugin(1) == nullptr, "out-of-range descriptor is null");
 
@@ -289,6 +289,9 @@ int main(int argc, char** argv)
     require(dirt && dirt->type == kOfxParamTypeChoice, "Dirt is a choice selector");
     require(smudge && smudge->type == kOfxParamTypeChoice, "Smudge is a choice selector");
     require(
+        lens->properties.strings.at(kOfxParamPropChoiceOption).size() == 21,
+        "Lens exposes the compatible v1.2 set plus twelve v1.3 recipes");
+    require(
         glass->properties.strings.at(kOfxParamPropChoiceOption).size() == 8,
         "Glass exposes seven built-ins plus compatibility Off");
     require(
@@ -320,6 +323,7 @@ int main(int argc, char** argv)
         "vignetteGroup",
         "surfaceGroup",
         "sensorGroup",
+        "workflowGroup",
     };
     for (const char* groupName : groups) {
         const ParamRecord* group = findParam(groupName);
@@ -327,6 +331,31 @@ int main(int argc, char** argv)
             group && group->type == kOfxParamTypeGroup,
             "lens-anatomy group exists");
     }
+
+    const ParamRecord* quality = findParam("quality");
+    const ParamRecord* geometryEnabled = findParam("geometryEnabled");
+    const ParamRecord* sensorEnabled = findParam("sensorEnabled");
+    const ParamRecord* sceneUnits = findParam("sceneUnits");
+    const ParamRecord* irisBlades = findParam("irisBlades");
+    const ParamRecord* starResponse = findParam("starFStopResponse");
+    require(
+        quality && quality->type == kOfxParamTypeChoice &&
+        intProperty(quality->properties, kOfxParamPropDefault) == 1,
+        "Full quality remains the compatibility default");
+    require(
+        geometryEnabled && sensorEnabled &&
+        intProperty(geometryEnabled->properties, kOfxParamPropDefault) == 1 &&
+        intProperty(sensorEnabled->properties, kOfxParamPropDefault) == 1,
+        "v1.3 render stages default to enabled");
+    require(
+        sceneUnits && sceneUnits->type == kOfxParamTypeChoice,
+        "physical scene units are exposed");
+    require(
+        irisBlades && irisBlades->type == kOfxParamTypeInteger,
+        "shared procedural iris is exposed");
+    require(
+        starResponse && starResponse->type == kOfxParamTypeDouble,
+        "physical starburst response is exposed");
 
     const ParamRecord* legacyRoot = findParam("glassAssetRoot");
     const ParamRecord* legacyAperture = findParam("apertureIndex");
@@ -344,7 +373,7 @@ int main(int argc, char** argv)
         intProperty(
             legacyDirt->properties,
             kOfxParamPropSecret) == 1,
-        "legacy filesystem controls are hidden from the v1.2 UI");
+        "legacy filesystem controls remain hidden from the v1.3 UI");
 #if defined(__APPLE__)
     require(
         stringProperty(
