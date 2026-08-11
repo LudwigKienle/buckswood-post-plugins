@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.8.0 - 2026-08-11
+
+- Added Buckswood Deband v1.0 for DaVinci Resolve and FilmLight Baselight.
+- Added three-scale gradient reconstruction with independent band detection,
+  edge protection, texture protection, and intentional-flat protection.
+- Added luma-first repair, optional chroma repair, targeted deterministic
+  dither, and four diagnostic views.
+- Preserved Float32 HDR, negative values, and alpha without hidden clipping.
+- Added universal macOS, Windows x64, and Linux x86-64/Baselight build paths.
+- Added signed/notarized macOS PKG and DMG packaging plus cross-host GitHub CI.
+- Documented the license audit of classical and neural open-source debanding
+  projects without copying copyleft or unlicensed source.
+
 ## v2.7.1 - 2026-07-27
 
 - Updated Buckswood DeJitter to v1.2 with a native OpenFX Draw Suite overlay.

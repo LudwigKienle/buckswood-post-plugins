@@ -1,0 +1,93 @@
+name: Deband cross-host builds
+
+on:
+  push:
+    branches: [main, "codex/**"]
+    tags: ["deband-v*"]
+    paths:
+      - "Buckswood_Deband/**"
+      - "shared/OfxRenderRuntime.h"
+      - "third_party/openfx/include/**"
+      - ".github/workflows/deband-cross-host.yml"
+  pull_request:
+    paths:
+      - "Buckswood_Deband/**"
+      - "shared/OfxRenderRuntime.h"
+      - "third_party/openfx/include/**"
+      - ".github/workflows/deband-cross-host.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS universal OFX
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, test, and package
+        run: bash Buckswood_Deband/scripts/build_macos_installer.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: buckswood-deband-macos
+          path: |
+            Buckswood_Deband/release/Buckswood_Deband_v1.0_Installer.pkg
+            Buckswood_Deband/release/Buckswood_Deband_v1.0_Installer.dmg
+            Buckswood_Deband/release/Buckswood_Deband_v1.0_macOS.zip
+            Buckswood_Deband/release/Buckswood_Deband_v1.0_SHA256SUMS.txt
+
+  windows:
+    name: Windows x64 OFX
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download llvm-mingw
+        run: |
+          mkdir -p third_party/toolchains
+          curl -L \
+            https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-macos-universal.tar.xz \
+            -o third_party/toolchains/llvm-mingw.tar.xz
+          tar -xf third_party/toolchains/llvm-mingw.tar.xz -C third_party/toolchains
+      - name: Build Windows package
+        run: bash Buckswood_Deband/scripts/build_windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: buckswood-deband-windows
+          path: |
+            Buckswood_Deband/release/windows/Buckswood_Deband_v1.0_Windows.zip
+            Buckswood_Deband/release/windows/Buckswood_Deband_v1.0_Windows_SHA256SUMS.txt
+
+  linux:
+    name: Linux x86-64 OFX for Baselight
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Linux/Baselight package
+        run: bash Buckswood_Deband/scripts/build_linux_baselight.sh
+      - name: Validate ELF exports
+        run: |
+          file Buckswood_Deband/release/linux/BuckswoodDeband.ofx.bundle/Contents/Linux-x86-64/BuckswoodDeband.ofx
+          nm -D Buckswood_Deband/release/linux/BuckswoodDeband.ofx.bundle/Contents/Linux-x86-64/BuckswoodDeband.ofx | grep OfxGetNumberOfPlugins
+          nm -D Buckswood_Deband/release/linux/BuckswoodDeband.ofx.bundle/Contents/Linux-x86-64/BuckswoodDeband.ofx | grep OfxGetPlugin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: buckswood-deband-linux-baselight
+          path: |
+            Buckswood_Deband/release/linux/Buckswood_Deband_v1.0_Linux_Baselight.zip
+            Buckswood_Deband/release/linux/Buckswood_Deband_v1.0_Linux_Baselight_SHA256SUMS.txt
+
+  publish:
+    name: Publish Deband release
+    if: startsWith(github.ref, 'refs/tags/deband-v')
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
