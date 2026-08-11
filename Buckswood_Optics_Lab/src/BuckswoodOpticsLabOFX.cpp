@@ -652,7 +652,7 @@ OfxStatus describeInContext(OfxImageEffectHandle effect)
     gEffectHost->getParamSet(effect, &paramSet);
     OfxPropertySetHandle page = nullptr;
     gParamHost->paramDefine(paramSet, kOfxParamTypePage, "Main", &page);
-    gPropHost->propSetString(page, kOfxPropLabel, 0, "Optics Lab v1.3");
+    gPropHost->propSetString(page, kOfxPropLabel, 0, "Optics Lab v1.3.1");
 
     int p = 0;
     constexpr const char* kLensGroup = "lensGroup";
@@ -968,7 +968,7 @@ OfxStatus describe(OfxImageEffectHandle effect)
     gPropHost->propSetInt(props, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
-    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.3");
+    gPropHost->propSetString(props, kOfxPropLabel, 0, "Buckswood Optics Lab v1.3.1");
     gPropHost->propSetString(props, kOfxImageEffectPluginPropGrouping, 0, "Buckswood");
     gPropHost->propSetString(props, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
 #if defined(__APPLE__)

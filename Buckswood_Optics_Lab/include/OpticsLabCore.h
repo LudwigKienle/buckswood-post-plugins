@@ -378,8 +378,14 @@ Pixel OpticsLabCore::processPixel(
         model.distortion * state.amount * r2 +
         model.distortion * state.amount * 0.28f * r2 * r2;
     const float mappingScale = radial * state.breathingScale;
-    const float srcX = cx + sx * mappingScale * cx;
-    const float srcY = cy + sy * mappingScale * cy;
+    const float fullSrcX = cx + sx * mappingScale * cx;
+    const float fullSrcY = cy + sy * mappingScale * cy;
+    const float pixelX = static_cast<float>(x);
+    const float pixelY = static_cast<float>(y);
+    const float srcX =
+        pixelX + (fullSrcX - pixelX) * c.outputMix;
+    const float srcY =
+        pixelY + (fullSrcY - pixelY) * c.outputMix;
     const Pixel center =
         state.identityMapping
         ? dry
@@ -732,7 +738,9 @@ Pixel OpticsLabCore::processPixel(
     }
 
     const float finalMix = c.outputMix;
-    result = mix(dry, result, finalMix);
+    // Geometry is mixed in coordinate space above. Mixing against the unwarped
+    // dry pixel here would create translucent double edges around silhouettes.
+    result = mix(center, result, finalMix);
     result.a = dry.a;
     return sanitize(result, dry);
 }

@@ -1,4 +1,4 @@
-# Buckswood Optics Lab v1.3
+# Buckswood Optics Lab v1.3.1
 
 ## Zweck
 
@@ -112,7 +112,7 @@ Dirt-Indexwerte bleiben aus Kompatibilitätsgründen erhalten und werden verwend
 solange die neuen Auswahllisten auf Off stehen. Die bezahlten Aperture-Dateien sind
 nicht Bestandteil des öffentlichen GitHub-Releases.
 
-## Performance in v1.3
+## Performance in v1.3.1
 
 Float32-Renderings verwenden unter macOS die Metal-Puffer von Resolve, einschließlich
 der integrierten Asset-Kanäle. Byte-Renderings oder fehlende GPU-Kontexte verwenden

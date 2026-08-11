@@ -13,7 +13,7 @@ This repository contains the source for ten Buckswood Resolve tools:
 - **Buckswood Temporal Integrity v2.1** - five-frame repair with confidence and ghost-risk protection.
 - **Buckswood Look DNA v2.2** - three-reference, spatial and five-frame look matching with native Browse / Load file pickers, tone, palette, semantic-region, texture, identity, gamut, and cut protection.
 - **Buckswood DeJitter v1.0** - user-selected regional tracking with symmetric temporal micro-jitter removal, confidence and cut guards, diagnostic overlays, and high-quality resampling.
-- **Buckswood Optics Lab v1.3** - modular zero-cost stages, Preview/Full quality, physical scene units, shared iris and f-stop diffraction, corrected foreground bokeh, twelve new lens recipes, lossless Metal acceleration, and Windows x64 support.
+- **Buckswood Optics Lab v1.3.1** - artifact-safe coordinate mixing, modular zero-cost stages, Preview/Full quality, physical scene units, shared iris and f-stop diffraction, corrected foreground bokeh, twelve new lens recipes, lossless Metal acceleration, and Windows x64 support.
 
 The primary release target is DaVinci Resolve/OpenFX. Premiere Pro and Nuke builds are packaged as separate host downloads.
 

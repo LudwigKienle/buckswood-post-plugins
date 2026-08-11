@@ -304,8 +304,12 @@ inline float4 processOpticsPixel(
         p.distortion * p.amount * r2 +
         p.distortion * p.amount * 0.28f * r2 * r2;
     const float mappingScale = radial * p.breathingScale;
-    const float srcX = cx + sx * mappingScale * cx;
-    const float srcY = cy + sy * mappingScale * cy;
+    const float fullSrcX = cx + sx * mappingScale * cx;
+    const float fullSrcY = cy + sy * mappingScale * cy;
+    const float srcX =
+        float(x) + (fullSrcX - float(x)) * p.outputMix;
+    const float srcY =
+        float(y) + (fullSrcY - float(y)) * p.outputMix;
     const float4 center =
         p.identityMapping != 0
         ? dry
@@ -743,7 +747,7 @@ inline float4 processOpticsPixel(
         result.b += noise * amount * 1.08f;
     }
 
-    result = mixPixel(dry, result, p.outputMix);
+    result = mixPixel(center, result, p.outputMix);
     result.a = dry.a;
     return sanitizePixel(result, dry);
 }

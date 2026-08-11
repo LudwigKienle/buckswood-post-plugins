@@ -30,6 +30,10 @@ bokeh orientation, and twelve new independently authored lens recipes. Lossless
 Float32 Metal rendering remains the default macOS path; Windows keeps the optimized
 Resolve worker-pool CPU fallback.
 
+V1.3.1 changes partial geometry strength from a dry/wet image dissolve to coordinate-
+space interpolation. Distortion, breathing, and swirl therefore remain a single
+continuous image instead of producing translucent duplicate contours near edges.
+
 ## Build and test
 
 ```bash
@@ -63,7 +67,7 @@ The script installs:
 ~/Library/Application Support/Buckswood/OpticsLab/GlassAssets
 ```
 
-The v1.3 UI needs no external folder. This optional helper only preserves access to
+The v1.3.1 UI needs no external folder. This optional helper only preserves access to
 the older 157-image local aperture library for projects that already used its legacy
 indices. Those paid assets remain excluded from public releases.
 

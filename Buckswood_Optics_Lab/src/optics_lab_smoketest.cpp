@@ -230,6 +230,47 @@ int main()
         std::fabs(foregroundResult.r - backgroundResult.r) > 0.0001f,
         "foreground bokeh mirrors cat-eye and odd iris orientation");
 
+    Controls geometryMix = defaults();
+    geometryMix.distortion = 0.50f;
+    geometryMix.outputMix = 0.50f;
+    geometryMix.edgeGuard = 0.0f;
+    const auto geometryState = OpticsLabCore::prepare(frame, geometryMix);
+    constexpr int geometryX = 56;
+    constexpr int geometryY = 24;
+    const float nx =
+        (static_cast<float>(geometryX) - geometryState.centerX) /
+        geometryState.centerX;
+    const float ny =
+        (static_cast<float>(geometryY) - geometryState.centerY) /
+        geometryState.centerY;
+    const float ax = nx * geometryState.aspect;
+    const float r2 = ax * ax + ny * ny;
+    const float radial =
+        1.0f +
+        geometryState.model.distortion * geometryState.amount * r2 +
+        geometryState.model.distortion * geometryState.amount * 0.28f * r2 * r2;
+    const float fullX =
+        geometryState.centerX + nx * radial * geometryState.centerX;
+    const float fullY =
+        geometryState.centerY + ny * radial * geometryState.centerY;
+    const float mixedX =
+        static_cast<float>(geometryX) +
+        (fullX - static_cast<float>(geometryX)) * geometryMix.outputMix;
+    const float mixedY =
+        static_cast<float>(geometryY) +
+        (fullY - static_cast<float>(geometryY)) * geometryMix.outputMix;
+    const Pixel geometryResult = OpticsLabCore::processPixel(
+        sampler,
+        geometryX,
+        geometryY,
+        geometryState);
+    const Pixel expectedGeometry = sampler.sample(mixedX, mixedY);
+    require(
+        near(geometryResult.r, expectedGeometry.r) &&
+        near(geometryResult.g, expectedGeometry.g) &&
+        near(geometryResult.b, expectedGeometry.b),
+        "geometry output mix interpolates coordinates without double-image edges");
+
     std::cout << "Buckswood Optics Lab core tests passed\n";
     return 0;
 }

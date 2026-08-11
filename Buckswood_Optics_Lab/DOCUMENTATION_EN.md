@@ -1,4 +1,4 @@
-# Buckswood Optics Lab v1.3
+# Buckswood Optics Lab v1.3.1
 
 ## Purpose
 
@@ -116,7 +116,7 @@ asset path, aperture index, and dirt index remain serialized and render unchange
 when the new selectors are Off. Paid aperture images are deliberately excluded
 from the public GitHub release.
 
-## V1.3 performance
+## V1.3.1 performance
 
 macOS Float32 renders use Resolve's Metal buffers, including all built-in asset
 channels. Safe Metal math is compared pixel-by-pixel with the CPU reference.
