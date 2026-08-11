@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.8.0 - 2026-08-11
+## v2.9.0 - 2026-08-11
 
 - Added Buckswood Deband v1.0 for DaVinci Resolve and FilmLight Baselight.
 - Added three-scale gradient reconstruction with independent band detection,
